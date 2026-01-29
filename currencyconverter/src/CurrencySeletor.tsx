@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Currency } from "./types";
 import { FlagIcon } from "./FlagIcon";
 import { ChevronIcon } from "./ChevronIcon";
-import { getCountryCodeByCurrency } from "./utils/services";
-import { getCurrentDateTime } from "./utils/services";
+import { getCountryCodeByCurrency } from "./utils/currencyToCountryMap";
+import { getCurrentDateTime } from "./utils/dateUtils";
 import { calculateExchangeRate } from "./utils/calculationsPositionComponents";
 
 interface CurrencySelectorProps {

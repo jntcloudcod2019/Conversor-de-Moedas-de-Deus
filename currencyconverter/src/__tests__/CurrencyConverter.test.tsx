@@ -13,15 +13,14 @@ vi.mock('../market-data- currency-converter', () => ({
 
 vi.mock('../utils/calculationsPositionComponents', () => ({
   calculateRateFromExchangeRates: vi.fn(),
-  calculateDisplayValues: vi.fn(),
   calculateExchangeRate: vi.fn().mockResolvedValue('1.00'),
-  calculateDropdownPosition: vi.fn().mockResolvedValue({ top: 0, left: 0 }),
 }))
 
-vi.mock('../utils/services', () => ({
-  useDeviceService: vi.fn(),
-  useSkeletonService: vi.fn(),
+vi.mock('../utils/dateUtils', () => ({
   getCurrentDateTime: vi.fn(() => '23/01/2026 às 10:30'),
+}))
+
+vi.mock('../utils/currencyToCountryMap', () => ({
   getCountryCodeByCurrency: vi.fn((code: string) => {
     const map: Record<string, string> = {
       BRL: 'BR',
@@ -37,8 +36,7 @@ vi.mock('../utils/services', () => ({
 
 // Importar os mocks para configurá-los
 import { currencyService } from '../market-data- currency-converter'
-import { calculateRateFromExchangeRates, calculateDisplayValues } from '../utils/calculationsPositionComponents'
-import { useDeviceService, useSkeletonService } from '../utils/services'
+import { calculateRateFromExchangeRates } from '../utils/calculationsPositionComponents'
 
 describe('CurrencyConverter', () => {
   // Suprimir logs de console durante testes
@@ -53,28 +51,8 @@ describe('CurrencyConverter', () => {
     console.error = vi.fn()
     
     // Configurar mocks padrão
-    // IMPORTANTE: mockImplementation é necessário porque useDeviceService recebe parâmetro (device)
-    ;(useDeviceService as any).mockImplementation((defaultDevice?: 'mobile' | 'web') => {
-      const device = defaultDevice || 'web';
-      return {
-        isMobile: device === 'mobile',
-        isWeb: device === 'web',
-        device: device,
-        width: device === 'mobile' ? 320 : 1024,
-        setDevice: vi.fn(),
-      };
-    })
-    
-    ;(useSkeletonService as any).mockReturnValue({
-      isLoading: false,
-      setIsLoading: vi.fn(),
-    })
     
     ;(calculateRateFromExchangeRates as any).mockResolvedValue(5.3789)
-    ;(calculateDisplayValues as any).mockResolvedValue({
-      displayFrom: '100,00',
-      displayTo: '537,89',
-    })
     
     // Mock padrão para currencyService - retorna Promise resolvida com null
     // IMPORTANTE: Por padrão, o mock retorna null para evitar requisições reais de API nos testes
@@ -1371,10 +1349,7 @@ describe('CurrencyConverter', () => {
         // Muda fromValue
         rerender(<CurrencyConverter {...props} fromValue={200} />)
         
-        // #region agent log: Test - displayFrom recalculation - after rerender
-        const wasCalled = (calculateDisplayValues as any).mock.calls.length > 0;
-        fetch('http://127.0.0.1:7242/ingest/91c52393-f929-4d82-9177-ae45437553d5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CurrencyConverter.test.tsx:displayFrom-recalc',message:'Test - displayFrom recalculation - AFTER RERENDER',data:{calculateDisplayValuesCalled:wasCalled,expectsCalled:false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'TEST8'})}).catch(()=>{});
-        // #endregion
+        // calculateDisplayValues não é mais usado - componente usa useMemo diretamente
         
         await waitFor(() => {
           // Deve exibir novo valor formatado

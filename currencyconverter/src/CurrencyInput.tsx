@@ -2,9 +2,8 @@ import React, { useRef, useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Currency } from "./types";
 import { FlagIcon } from "./FlagIcon";
-import { getCountryCodeByCurrency } from "./utils/services";
+import { getCountryCodeByCurrency } from "./utils/currencyToCountryMap";
 import { ChevronIcon } from "./ChevronIcon";
-import { calculateDropdownPosition } from "./utils/calculationsPositionComponents";
 
 interface CurrencyInputProps {
   value: number | "";
@@ -13,8 +12,6 @@ interface CurrencyInputProps {
   disabled?: boolean;
   onValueChange: (value: number) => void;
   onCurrencyChange: (currency: Currency) => void;
-  // Props opcionais para o dropdown
-  exchangeRates?: Record<string, number>;
   // Se true, mostra apenas o input sem dropdown (variação)
   showDropdown?: boolean;
 }
@@ -26,16 +23,14 @@ const CurrencyDropdown: React.FC<{
   currency: Currency;
   currencies: Currency[];
   onCurrencyChange: (currency: Currency) => void;
-  exchangeRates?: Record<string, number>;
 }> = ({ currency, currencies, onCurrencyChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [listboxWidth, setListboxWidth] = useState<number | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listboxInnerRef = useRef<HTMLDivElement>(null);
-  const flagRef = useRef<HTMLDivElement>(null);
-  const codeRef = useRef<HTMLSpanElement>(null);
   const currencyItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   
   const sortedCurrencies = useMemo(() => 
@@ -46,43 +41,47 @@ const CurrencyDropdown: React.FC<{
   const handleSelectCurrency = (selectedCurrency: Currency) => {
     onCurrencyChange(selectedCurrency);
     setIsOpen(false);
+    setActiveIndex(-1);
+    rootRef.current?.focus();
   };
 
-  // Calcula a posição do dropdown quando abre - abaixo da borda do input, alinhado à direita
   useEffect(() => {
     if (isOpen && rootRef.current) {
       const rect = rootRef.current.getBoundingClientRect();
+      const widthToUse = Math.max(listboxWidth ?? 100, 100);
+      const offsetTop = 12;
       
-      const result = calculateDropdownPosition({
-        rect,
-        listboxWidth: listboxWidth ?? 100,
-        itemCount: sortedCurrencies.length,
-        offsetTop: 12,
-        offsetLeft: 0,
-        minListboxWidth: 100,
-      });
+      // Posição inicial: abaixo do trigger, alinhado à direita
+      let left = rect.right - widthToUse;
+      let top = rect.bottom + offsetTop;
       
-      if (result) {
-        setPosition({ top: result.top, left: result.left });
+      // Ajuste horizontal básico: garante que não saia das bordas
+      const MARGIN = 8;
+      if (left < MARGIN) {
+        left = MARGIN;
+      } else if (left + widthToUse > window.innerWidth - MARGIN) {
+        left = window.innerWidth - widthToUse - MARGIN;
       }
+      
+      setPosition({ top, left });
     }
   }, [isOpen, listboxWidth, sortedCurrencies.length]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        isOpen &&
-        rootRef.current &&
-        !rootRef.current.contains(event.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      const target = event.target as Node;
+      const isClickInsideRoot = rootRef.current?.contains(target);
+      const isClickInsideDropdown = dropdownRef.current?.contains(target);
+      
+      if (isOpen && !isClickInsideRoot && !isClickInsideDropdown) {
         setIsOpen(false);
+        setActiveIndex(-1);
       }
     };
 
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+      
       return () => {
         document.removeEventListener("mousedown", handleClickOutside);
       };
@@ -114,53 +113,48 @@ const CurrencyDropdown: React.FC<{
         return calculatedWidth;
       });
       
-      // Recalcula a posição com a largura correta e detecção de viewport
+      // Recalcula a posição com a largura correta
       const triggerRect = rootRef.current.getBoundingClientRect();
-      if (triggerRect && listboxInnerRef.current) {
-        // Estima altura baseada no conteúdo renderizado
-        const listboxHeight = listboxInnerRef.current.scrollHeight;
+      if (triggerRect) {
+        const offsetTop = 12;
+        const MARGIN = 8;
         
-        const adjustedPosition = calculateDropdownPosition({
-          rect: triggerRect,
-          listboxWidth: calculatedWidth,
-          listboxHeight,
-          itemCount: sortedCurrencies.length,
-          offsetTop: 12,
-          offsetLeft: 0,
-          minListboxWidth: 100,
-        });
+        // Posição inicial: abaixo do trigger, alinhado à direita
+        let left = triggerRect.right - calculatedWidth;
+        let top = triggerRect.bottom + offsetTop;
         
-        if (adjustedPosition) {
-          setPosition((prevPosition) => {
-            const newPosition = { top: adjustedPosition.top, left: adjustedPosition.left };
-            // Só atualiza se a posição realmente mudou (evita loop infinito)
-            if (prevPosition.top === newPosition.top && prevPosition.left === newPosition.left) {
-              return prevPosition;
-            }
-            return newPosition;
-          });
+        // Ajuste horizontal básico: garante que não saia das bordas
+        if (left < MARGIN) {
+          left = MARGIN;
+        } else if (left + calculatedWidth > window.innerWidth - MARGIN) {
+          left = window.innerWidth - calculatedWidth - MARGIN;
         }
+        
+        // Ajuste vertical: se não couber embaixo, limita ao fundo da viewport
+        const listboxHeight = listboxInnerRef.current.scrollHeight;
+        const spaceBelow = window.innerHeight - triggerRect.bottom - offsetTop;
+        if (spaceBelow < listboxHeight) {
+          top = window.innerHeight - listboxHeight - MARGIN;
+        }
+        
+        setPosition((prevPosition) => {
+          const newPosition = { top, left };
+          // Só atualiza se a posição realmente mudou (evita loop infinito)
+          if (prevPosition.top === newPosition.top && prevPosition.left === newPosition.left) {
+            return prevPosition;
+          }
+          return newPosition;
+        });
       }
     });
   }, [isOpen, sortedCurrencies.length]);
 
-  // Debug: Verifica scroll após renderização
-  useEffect(() => {
-    if (isOpen && dropdownRef.current && listboxInnerRef.current) {
-      // Aguarda um frame para garantir que o DOM está atualizado
-      requestAnimationFrame(() => {
-        if (dropdownRef.current && listboxInnerRef.current) {
-        }
-      });
-    }
-  }, [isOpen, sortedCurrencies.length]);
-
-  // Controla animação de entrada/saída e scroll para item selecionado
   useEffect(() => {
     if (isOpen && dropdownRef.current) {
       // Inicia com estado inicial (invisível)
       dropdownRef.current.style.opacity = '0';
       dropdownRef.current.style.transform = 'translateY(-8px) scale(0.98)';
+      
       
       // Após um frame, anima para estado final (visível)
       requestAnimationFrame(() => {
@@ -178,55 +172,99 @@ const CurrencyDropdown: React.FC<{
                 inline: 'center'
               });
             }
+            
+            // Foca no primeiro item para navegação por teclado
+            const firstItem = sortedCurrencies[0];
+            if (firstItem) {
+              const firstItemRef = currencyItemRefs.current.get(firstItem.code);
+              firstItemRef?.focus();
+            }
           }
         });
       });
+    } else {
+      setActiveIndex(-1);
     }
-  }, [isOpen, currency.code]);
+  }, [isOpen, currency.code, sortedCurrencies]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!isOpen) {
+      return;
+    }
+
+    switch (e.key) {
+      case 'Escape':
+        e.preventDefault();
+        setIsOpen(false);
+        setActiveIndex(-1);
+        rootRef.current?.focus();
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveIndex((prev) => {
+          const next = (prev + 1) % sortedCurrencies.length;
+          const nextCurrency = sortedCurrencies[next];
+          const nextItemRef = currencyItemRefs.current.get(nextCurrency.code);
+          nextItemRef?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          nextItemRef?.focus();
+          return next;
+        });
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveIndex((prev) => {
+          const next = prev <= 0 ? sortedCurrencies.length - 1 : prev - 1;
+          const nextCurrency = sortedCurrencies[next];
+          const nextItemRef = currencyItemRefs.current.get(nextCurrency.code);
+          nextItemRef?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          nextItemRef?.focus();
+          return next;
+        });
+        break;
+    }
+  };
 
   const listboxContent = isOpen ? (
     <div
       ref={dropdownRef}
       role="listbox"
+      id="currency-dropdown-listbox"
       aria-label="Selecionar moeda"
-      className="fixed bg-white border border-gray-200 rounded-lg shadow-lg"
+      className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999]"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
         width: listboxWidth ? `${listboxWidth}px` : 'auto',
         minWidth: '100px',
-        maxHeight: '400px',
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        zIndex: 9999,
-        opacity: 0,
-        transform: 'translateY(-8px) scale(0.98)',
-        transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
-        scrollbarWidth: 'thin',
-        scrollbarColor: '#cbd5e0 #f7fafc',
+        maxHeight: '400px'
       }}
     >
       <div ref={listboxInnerRef} className="py-1">
-        {sortedCurrencies.map((curr) => (
-          <button
-            key={curr.code}
-            ref={(el) => {
-              if (el) {
-                currencyItemRefs.current.set(curr.code, el);
-              } else {
-                currencyItemRefs.current.delete(curr.code);
-              }
-            }}
-            type="button"
-            role="option"
-            aria-selected={curr.code === currency.code}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSelectCurrency(curr);
-            }}
-            className={`w-full py-2 bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors ${
-              curr.code === currency.code ? "font-semibold" : ""
-            }`}
+        {sortedCurrencies.map((curr, idx) => {
+          const isSelected = curr.code === currency.code;
+          const isActive = idx === activeIndex;
+          return (
+            <button
+              key={curr.code}
+              ref={(el) => {
+                if (el) {
+                  currencyItemRefs.current.set(curr.code, el);
+                } else {
+                  currencyItemRefs.current.delete(curr.code);
+                }
+              }}
+              type="button"
+              role="option"
+              aria-selected={isSelected}
+              tabIndex={isActive ? 0 : -1}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelectCurrency(curr);
+              }}
+              onMouseEnter={() => setActiveIndex(idx)}
+              className={`w-full py-2 bg-white hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${
+                isSelected ? "font-semibold" : ""
+              } ${isActive ? "bg-gray-100" : ""}`}
             style={{
               minHeight: '40px',
               backgroundColor: 'white',
@@ -242,7 +280,8 @@ const CurrencyDropdown: React.FC<{
             </div>
             <span className="font-inter text-sm text-center">{curr.code}</span>
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   ) : null;
@@ -255,16 +294,18 @@ const CurrencyDropdown: React.FC<{
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-label="Selecionar moeda"
-        className="relative w-auto min-w-[90px] sm:min-w-[100px] h-5 flex items-center justify-end gap-1 shrink-0 cursor-pointer"
+        aria-controls="currency-dropdown-listbox"
+        tabIndex={0}
+        className="relative w-auto min-w-[90px] sm:min-w-[100px] h-5 flex items-center justify-end gap-1 shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
         style={{ overflow: 'visible' }}
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
+        onKeyDown={handleKeyDown}
       >
         {/* Flag no botão dropdown */}
         <div
-          ref={flagRef}
           className="w-5 h-5 shrink-0 rounded-full overflow-hidden flex items-center justify-center"
         >
           <FlagIcon
@@ -272,7 +313,6 @@ const CurrencyDropdown: React.FC<{
           />
         </div>
         <span
-          ref={codeRef}
           className="font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600 whitespace-nowrap"
           style={{ minWidth: 'fit-content' }}
         >
@@ -298,12 +338,6 @@ const CurrencyDropdown: React.FC<{
   );
 };
 
-/**
- * Componente de input de moeda com dropdown integrado
- * Variações:
- * - showDropdown=true (padrão): mostra dropdown de seleção de moeda
- * - showDropdown=false: mostra apenas o código da moeda (sem dropdown)
- */
 export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   value,
   currency,
@@ -311,11 +345,32 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   disabled = false,
   onValueChange,
   onCurrencyChange,
-  exchangeRates,
   showDropdown = true,
 }) => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onValueChange(Number(e.target.value) || 0);
+    const newValue = e.target.value;
+    
+    // Permite limpar o campo
+    if (newValue === "") {
+      onValueChange(0);
+      return;
+    }
+    
+    // Permite digitação de decimais (ex: "10.", "10.5")
+    // Remove caracteres não numéricos exceto ponto/vírgula
+    const cleanedValue = newValue.replace(/[^\d.,]/g, '');
+    
+    // Converte vírgula para ponto para parseFloat
+    const normalizedValue = cleanedValue.replace(',', '.');
+    
+    // Verifica se é um número válido
+    const numValue = parseFloat(normalizedValue);
+    if (!isNaN(numValue) && isFinite(numValue)) {
+      onValueChange(numValue);
+    } else if (cleanedValue === '' || cleanedValue === '.' || cleanedValue === ',') {
+      // Permite digitação parcial (ex: "10." antes de completar)
+      onValueChange(0);
+    }
   };
 
   const getContainerClasses = (disabled: boolean): string => {
@@ -324,7 +379,8 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
       "flex-row",
       "items-center",
       "gap-2",
-      "w-[525px]",
+      "w-full",
+      "max-w-[525px]",
       "h-11",
       "px-4",
       "py-3",
@@ -366,7 +422,6 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
           currency={currency}
           currencies={currencies}
           onCurrencyChange={onCurrencyChange}
-          exchangeRates={exchangeRates}
         />
       ) : (
         <div className="relative w-auto min-w-[90px] sm:min-w-[100px] h-5 flex items-center justify-end gap-1 shrink-0">
@@ -382,7 +437,8 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
       )}
       <div className="w-px h-6 bg-[#cccccc] shrink-0" />
       <input
-        type="number"
+        type="text"
+        inputMode="decimal"
         id={showDropdown ? `currency-input-${currency.code.toLowerCase()}` : undefined}
         name={showDropdown ? `currency-${currency.code.toLowerCase()}` : undefined}
         value={value || ""}
@@ -394,6 +450,12 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
           color: "var(--colors-Content-one, #525252)",
           opacity: 1,
         }}
+        onWheel={(e) => {
+          // Previne mudança de valor ao usar scroll wheel
+          if (document.activeElement === e.currentTarget) {
+            e.currentTarget.blur();
+          }
+        }}
       />
     </div>
   );
@@ -403,18 +465,16 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
  * Exporta também o componente dropdown separado para compatibilidade
  * @deprecated Use CurrencyInput com showDropdown=true
  */
-export const InputCurrencyDropdown: React.FC<{
+export const CurrencyInputDropdown: React.FC<{
   currency: Currency;
   currencies: Currency[];
   onCurrencyChange: (currency: Currency) => void;
-  exchangeRates?: Record<string, number>;
-}> = ({ currency, currencies, onCurrencyChange, exchangeRates }) => {
+}> = ({ currency, currencies, onCurrencyChange }) => {
   return (
     <CurrencyDropdown
       currency={currency}
       currencies={currencies}
       onCurrencyChange={onCurrencyChange}
-      exchangeRates={exchangeRates}
     />
   );
 };

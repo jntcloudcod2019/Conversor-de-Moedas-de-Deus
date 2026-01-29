@@ -1,9 +1,8 @@
 import React from "react";
 import { CurrencyConverterProps, CurrencyConverterData, DEFAULT_CURRENCY_CODES } from "./types";
-import { getCurrentDateTime } from "./utils/services";
+import { getCurrentDateTime } from "./utils/dateUtils";
 import { calculateRateFromExchangeRates } from "./utils/calculationsPositionComponents";
-import { InputCurrencyDropdown } from "./CurrencyInput";
-import { useDeviceService, useSkeletonService } from "./utils/services";
+import { CurrencyInputDropdown } from "./CurrencyInput";
 import {
   formatNumber,
   getDecimals,
@@ -11,7 +10,8 @@ import {
   sanitizeRawInput,
 } from "./utils/currencyCalculators";
 import { currencyService } from "./market-data- currency-converter";
-import { SwapButtonWeb, SwapButtonMobile } from "./ChevronIcon";
+import { SwapButtonWeb } from "./ChevronIcon";
+import CurrencyConverterSkeleton from "./components/Skeleton/CurrencyConverterSkeleton";
 
 export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
   fromValue,
@@ -21,20 +21,26 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
   rate: propRate,
   currencies: propCurrencies,
   exchangeRates: propExchangeRates,
-  device,
   lastUpdated: propLastUpdated,
   onFromValueChange,
   onToValueChange,
   onFromCurrencyChange,
   onToCurrencyChange,
-  onSwap,
   converterData,
   currencyCodesToFetch = DEFAULT_CURRENCY_CODES,
 }) => {
   const [loadedData, setLoadedData] = React.useState<CurrencyConverterData | null>(null);
   const [hasTriedLoadApi, setHasTriedLoadApi] = React.useState(false);
   const retryTimeoutRef = React.useRef<number | null>(null);
-  const { isLoading, setIsLoading } = useSkeletonService();
+  const [showSkeleton, setShowSkeleton] = React.useState(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSkeleton(false);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, []);
   
   // Estilos inline para prevenir truncamento - aplicados diretamente no JSX, sem timeouts
   const titleStyles: React.CSSProperties = {
@@ -53,59 +59,104 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
     width: '100%',
   };
 
-  const titleRefMobile = React.useRef<HTMLHeadingElement>(null);
-  const titleRefWeb = React.useRef<HTMLHeadingElement>(null);
+  const titleRef = React.useRef<HTMLHeadingElement>(null);
+  const titleWrapperRef = React.useRef<HTMLDivElement>(null);
+  const protectionIntervalRef = React.useRef<number | null>(null);
+  const observerRef = React.useRef<MutationObserver | null>(null);
 
-  React.useEffect(() => {
-    const CORRECT_TEXT = 'Conversor de moedas';
+  // Função para proteger o título
+  const protectTitle = React.useCallback(() => {
+    if (titleRef.current && titleRef.current.textContent !== 'Conversor de moedas') {
+      titleRef.current.textContent = 'Conversor de moedas';
+    }
+  }, []);
+
+  // Callback ref que é chamado quando o elemento é montado
+  const titleRefCallback = React.useCallback((element: HTMLHeadingElement | null) => {
+    titleRef.current = element;
     
-    const protectTitle = (element: HTMLElement | null) => {
-      if (!element) return;
+    if (element) {
+      element.textContent = 'Conversor de moedas';
       
-      // Verifica e corrige o texto se necessário
-      if (element.textContent !== CORRECT_TEXT && element.innerText !== CORRECT_TEXT) {
-        element.textContent = CORRECT_TEXT;
+      // Configura MutationObserver quando o elemento é montado
+      if (observerRef.current) {
+        observerRef.current.disconnect();
       }
-    };
-
-    // Monitora e protege contra modificações
-    const observeAndProtect = (element: HTMLElement | null) => {
-      if (!element) return null;
       
       const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           if (mutation.type === 'childList' || mutation.type === 'characterData') {
-            const currentText = element.textContent || '';
-            if (currentText !== CORRECT_TEXT) {
-              element.textContent = CORRECT_TEXT;
-            }
+            protectTitle();
           }
         });
       });
 
       observer.observe(element, {
         childList: true,
-        characterData: true,
         subtree: true,
+        characterData: true,
+        characterDataOldValue: true,
       });
+      
+      observerRef.current = observer;
 
-      return observer;
+      // Fallback: verificação periódica a cada 500ms
+      if (protectionIntervalRef.current) {
+        clearInterval(protectionIntervalRef.current);
+      }
+      protectionIntervalRef.current = window.setInterval(protectTitle, 500);
+    } else {
+      // Elemento desmontado - limpa observers
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+      if (protectionIntervalRef.current) {
+        clearInterval(protectionIntervalRef.current);
+        protectionIntervalRef.current = null;
+      }
+    }
+  }, [protectTitle]);
+
+  // Cleanup ao desmontar
+  React.useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+      if (protectionIntervalRef.current) {
+        clearInterval(protectionIntervalRef.current);
+      }
     };
+  }, []);
 
-    // Protege ambos os títulos
-    protectTitle(titleRefMobile.current);
-    protectTitle(titleRefWeb.current);
-    
-    const observerMobile = observeAndProtect(titleRefMobile.current);
-    const observerWeb = observeAndProtect(titleRefWeb.current);
+  React.useLayoutEffect(() => {
+    if (converterData) {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+      return;
+    }
+    if (loadedData) {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+      return;
+    }
+    if (currencyCodesToFetch.length === 0) {
+      return;
+    }
+    if (hasTriedLoadApi) {
+      return;
+    }
 
-    setIsLoading(true);
     setHasTriedLoadApi(true);
     
     currencyService
       .getCurrencyConverterData([...currencyCodesToFetch], 'USD')
       .then((data: CurrencyConverterData | null) => {
-        setIsLoading(false);
         if (data) setLoadedData(data);
         if (retryTimeoutRef.current) {
           clearTimeout(retryTimeoutRef.current);
@@ -113,7 +164,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
         }
       })
       .catch(() => {
-        setIsLoading(false);
         setHasTriedLoadApi(false);
         retryTimeoutRef.current = window.setTimeout(() => {
           setHasTriedLoadApi(false);
@@ -222,21 +272,11 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
     onToValueChange(numeric);
   };
 
-  const deviceService = useDeviceService(device);
-  const { device: detectedDevice } = deviceService;
-  
-  const isMobile = device === "mobile" 
-    ? true 
-    : device === "web" 
-    ? false 
-    : detectedDevice === "mobile";
   const isFromInputFocused = React.useRef(false);
   const isToInputFocused = React.useRef(false);
   
-  const fromInputContainerRefMobile = React.useRef<HTMLDivElement>(null);
-  const toInputContainerRefMobile = React.useRef<HTMLDivElement>(null);
-  const fromInputContainerRefWeb = React.useRef<HTMLDivElement>(null);
-  const toInputContainerRefWeb = React.useRef<HTMLDivElement>(null);
+  const fromInputContainerRef = React.useRef<HTMLDivElement>(null);
+  const toInputContainerRef = React.useRef<HTMLDivElement>(null);
   const formatRawValue = (value: number, code: string): string => {
     if (value === 0) return "";
     return formatNumber(
@@ -256,9 +296,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
     setRawFromInput(formatRawValue(fromVal, fromCode));
     setRawToInput(formatRawValue(toVal, toCode));
   };
-  
-  const currentFromNumeric = fromValue;
-  const currentToNumeric = toValue;
   
   React.useEffect(() => {
     if (isFromInputFocused.current) {
@@ -285,337 +322,118 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
   }, [toValue, toCurrency.code, decimalSeparator, thousandSeparator]);
 
   const handleSwapClick = () => {
-    const currentHasFromRaw = rawFromInput.trim() !== "";
-    const currentHasToRaw = rawToInput.trim() !== "";
-    
     syncRawInputs(toValue, fromValue, toCurrency.code, fromCurrency.code);
-    
-    if (onSwap) {
-      onSwap({
-        fromValue: currentFromNumeric,
-        toValue: currentToNumeric,
-        hasFromInput: currentHasFromRaw,
-        hasToInput: currentHasToRaw,
-      });
+    onFromCurrencyChange(toCurrency);
+    onToCurrencyChange(fromCurrency);
+    onFromValueChange(toValue);
+    if (onToValueChange) {
+      onToValueChange(fromValue);
     }
   };
 
-  // Componente SkeletonElement com animação
-  // Componente SkeletonElement com animação
-  const SkeletonElement: React.FC<{ 
-    width?: string | number; 
-    height?: string | number; 
-    className?: string;
-    variant?: 'text' | 'circular' | 'rectangular';
-  }> = ({ width = '100%', height = '1rem', className = '', variant = 'rectangular' }) => {
-    const style: React.CSSProperties = {
-      width: typeof width === 'number' ? `${width}px` : width,
-      height: typeof height === 'number' ? `${height}px` : height,
-      borderRadius: variant === 'circular' ? '50%' : variant === 'text' ? '4px' : '8px',
-    };
 
-    const variantClasses = {
-      text: 'rounded',
-      circular: 'rounded-full',
-      rectangular: 'rounded-lg',
-    };
-
-    return (
-      <div 
-        role="status" 
-        aria-label="Carregando..."
-        className={`bg-gray-200 dark:bg-gray-700 animate-pulse ${variantClasses[variant]} ${className}`}
-        style={style}
-      />
-    );
-  };
-
-  const containerClassName = isMobile
-    ? "flex flex-col gap-5 bg-white border-2 border-wl-neutral-200 rounded-2xl shadow-lg w-full max-w-md mx-auto p-4 sm:p-6 overflow-visible"
-    : "flex flex-col gap-5 bg-white border-2 border-wl-neutral-200 rounded-2xl shadow-lg w-full max-w-6xl mx-auto p-4 sm:p-6 overflow-visible";
-  
-  const containerStyle: React.CSSProperties = {
-    borderColor: 'rgba(0, 0, 0, 0.35)',
-    borderWidth: '2px',
-    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-  };
-
+  const containerClassName = "flex flex-col gap-5 bg-white border-2 border-wl-neutral-200 rounded-2xl shadow-lg w-full max-w-md sm:max-w-6xl mx-auto p-4 sm:p-6 overflow-visible";
 
   return (
-    <div className={containerClassName} style={containerStyle}>
-      {/* Se estiver carregando (skeleton service), mostra o skeleton */}
-      {isLoading ? (
-        <>
-          {isMobile ? (
-            <>
-              <div className="w-full px-3 sm:px-4">
-                <SkeletonElement variant="text" width="60%" height="28px" />
-              </div>
-              
-              <div className="flex flex-col items-center gap-2 w-full">
-                {/* Skeleton Input FROM */}
-                <div className="flex flex-row items-center gap-2 w-full h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md" style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}>
-                  <SkeletonElement variant="text" width="45%" height="20px" />
-                  <div className="flex items-center gap-1 ml-auto">
-                    <SkeletonElement variant="circular" width={24} height={24} />
-                    <SkeletonElement variant="text" width="35px" height="18px" />
-                    <SkeletonElement variant="text" width="10px" height="10px" />
-                  </div>
-                </div>
-                
-                {/* Skeleton Swap Button */}
-                <SkeletonElement variant="rectangular" width={48} height={48} className="rounded-full" />
-                
-                {/* Skeleton Input TO */}
-                <div className="flex flex-row items-center gap-2 w-full h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md" style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}>
-                  <SkeletonElement variant="text" width="45%" height="20px" />
-                  <div className="flex items-center gap-1 ml-auto">
-                    <SkeletonElement variant="circular" width={24} height={24} />
-                    <SkeletonElement variant="text" width="35px" height="18px" />
-                    <SkeletonElement variant="text" width="10px" height="10px" />
-                  </div>
-                </div>
-                
-                {/* Skeleton Summary */}
-                <div className="flex flex-col items-center gap-1 w-full mt-2">
-                  <SkeletonElement variant="text" width="75%" height="16px" />
-                  <SkeletonElement variant="text" width="65%" height="14px" />
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div 
-                className="w-full px-3 sm:px-4" 
-                style={{ ...titleWrapperStyles, textAlign: 'justify' }}
-              >
-                <SkeletonElement variant="text" width="40%" height="28px" />
-              </div>
-              
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 w-full">
-                {/* Skeleton Input FROM */}
-                <div className="flex flex-row items-center flex-1 min-w-0 h-11 px-4 py-3 bg-white border-2 rounded-2xl shadow-md transition-all overflow-hidden" style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}>
-                  <SkeletonElement variant="text" width="55%" height="20px" />
-                  <div className="flex items-center gap-1 ml-auto shrink-0">
-                    <SkeletonElement variant="circular" width={24} height={24} />
-                    <SkeletonElement variant="text" width="35px" height="18px" />
-                    <SkeletonElement variant="text" width="10px" height="10px" />
-                  </div>
-                </div>
-                
-                {/* Skeleton Swap Button */}
-                <div className="flex justify-center sm:justify-start">
-                  <SkeletonElement variant="rectangular" width={48} height={48} className="rounded-full" />
-                </div>
-                
-                {/* Skeleton Input TO */}
-                <div className="flex flex-row items-center flex-1 min-w-0 h-11 px-4 py-3 bg-white border-2 rounded-2xl shadow-md transition-all overflow-hidden" style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}>
-                  <SkeletonElement variant="text" width="55%" height="20px" />
-                  <div className="flex items-center gap-1 ml-auto shrink-0">
-                    <SkeletonElement variant="circular" width={24} height={24} />
-                    <SkeletonElement variant="text" width="35px" height="18px" />
-                    <SkeletonElement variant="text" width="10px" height="10px" />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Skeleton Summary */}
-              <div className="flex flex-col items-center gap-2 w-full">
-                <div className="flex flex-row flex-wrap justify-center items-center gap-2 w-full px-2">
-                  <SkeletonElement variant="text" width="130px" height="44px" className="sm:h-12 lg:h-16" />
-                  <SkeletonElement variant="text" width="24px" height="36px" className="sm:h-8" />
-                  <SkeletonElement variant="text" width="130px" height="44px" className="sm:h-12 lg:h-16" />
-                </div>
-                <div className="flex flex-col gap-1 w-full">
-                  <SkeletonElement variant="text" width="65%" height="16px" />
-                </div>
-              </div>
-            </>
-          )}
-        </>
+    <div className={containerClassName}>
+      {showSkeleton ? (
+        <CurrencyConverterSkeleton />
       ) : (
         <>
-          {/* Conteúdo principal do componente */}
-          {isMobile ? (
-            <>
-              <div 
-                className="w-full px-3 sm:px-4" 
-                style={{ ...titleWrapperStyles, textAlign: 'justify' }}
-              >
-                <h2 
-                  ref={titleRefMobile}
-                  className="font-inter font-medium text-xl leading-7 tracking-tight-xs text-wl-neutral-950 m-0"
-                  style={{ ...titleStyles, textAlign: 'justify' }}
-                >
-                  Conversor de moedas
-                </h2>
+          <div 
+            ref={titleWrapperRef}
+            className="w-full px-3 sm:px-4 responsive-title-wrapper"
+            style={{ ...titleWrapperStyles, textAlign: 'justify' }}
+          >
+            <h2 
+              ref={titleRefCallback}
+              className="font-inter font-medium text-xl sm:text-2xl leading-7 sm:leading-8 tracking-tight-xs text-wl-neutral-950 m-0"
+              style={{ ...titleStyles, textAlign: 'justify' }}
+            >
+              Conversor de moedas
+            </h2>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-center sm:items-stretch gap-2 sm:gap-4 sm:gap-6 w-full">
+            <div 
+              ref={fromInputContainerRef}
+              className="flex flex-row items-center w-full sm:flex-1 min-w-0 h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md relative transition-all overflow-hidden" 
+              style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}
+            >
+              <input
+                type="text"
+                inputMode="decimal"
+                id="currency-converter-from-input"
+                name="fromValue"
+                value={rawFromInput}
+                onChange={handleInputChange}
+                onFocus={() => { isFromInputFocused.current = true; }}
+                onBlur={() => { isFromInputFocused.current = false; }}
+                placeholder="0,00"
+                className="font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600 min-w-0 w-full sm:flex-1 max-w-[calc(100%-90px)] sm:max-w-none h-5 border-0 outline-none bg-transparent placeholder-wl-neutral-400"
+              />
+              <div className="shrink-0 ml-2">
+                <CurrencyInputDropdown
+                  currency={fromCurrency}
+                  currencies={currencies}
+                  onCurrencyChange={onFromCurrencyChange}
+                />
               </div>
-              <div className="flex flex-col items-center gap-2 w-full">
-                {/* Input FROM */}
-                <div 
-                  ref={fromInputContainerRefMobile}
-                  className="flex flex-row items-center gap-2 w-full h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md relative transition-all overflow-hidden" 
-                  style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}
-                >
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    id="currency-converter-from-input"
-                    name="fromValue"
-                    value={rawFromInput}
-                    onChange={handleInputChange}
-                    onFocus={() => { isFromInputFocused.current = true; }}
-                    onBlur={() => { isFromInputFocused.current = false; }}
-                    placeholder="0,00"
-                    className="font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600 min-w-0 w-full max-w-[calc(100%-90px)] h-5 border-0 outline-none bg-transparent placeholder-wl-neutral-400"
-                  />
-                  <InputCurrencyDropdown
-                    currency={fromCurrency}
-                    currencies={currencies}
-                    onCurrencyChange={onFromCurrencyChange}
-                  />
-                </div>
+            </div>
 
-                <SwapButtonMobile onClick={handleSwapClick} />
+            <div className="flex justify-center sm:justify-start">
+              <SwapButtonWeb onClick={handleSwapClick} />
+            </div>
 
-                {/* Input TO */}
-                <div 
-                  ref={toInputContainerRefMobile}
-                  className="flex flex-row items-center gap-2 w-full h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md relative transition-all overflow-hidden" 
-                  style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}
-                >
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    id="currency-converter-to-input"
-                    name="toValue"
-                    value={rawToInput}
-                    onChange={handleToInputChange}
-                    onFocus={() => { isToInputFocused.current = true; }}
-                    onBlur={() => { isToInputFocused.current = false; }}
-                    placeholder="0,00"
-                    className="font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600 min-w-0 w-full max-w-[calc(100%-90px)] h-5 border-0 outline-none bg-transparent placeholder-wl-neutral-400"
-                  />
-                  <InputCurrencyDropdown
-                    currency={toCurrency}
-                    currencies={currencies}
-                    onCurrencyChange={onToCurrencyChange}
-                  />
-                </div>
-
-                {/* Rodapé dinâmico: valores atuais e cotação */}
-                <div className="flex flex-col items-center gap-1 w-full" key={`summary-mobile-${fromValue}-${toValue}-${fromCurrency.code}-${toCurrency.code}`}>
-                  <p className="font-inter font-semibold text-xs leading-4 text-wl-neutral-700 text-center m-0 px-2" key={`summary-text-${displayFrom}-${displayTo}`}>
-                    {fromCurrency.symbol} {displayFrom} = {toCurrency.symbol} {displayTo}
-                  </p>
-                  <p className="font-inter font-normal text-xs leading-4 text-wl-neutral-600 text-center m-0 px-2 whitespace-nowrap">
-                    1 {fromCurrency.code} = {rate.toFixed(2)} {toCurrency.code} em {lastUpdatedLabel}
-                  </p>
-                </div>
+            <div 
+              ref={toInputContainerRef}
+              className="flex flex-row items-center w-full sm:flex-1 min-w-0 h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md relative transition-all overflow-hidden" 
+              style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}
+            >
+              {onToValueChange ? (
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  id="currency-converter-to-input"
+                  name="toValue"
+                  value={rawToInput}
+                  onChange={handleToInputChange}
+                  onFocus={() => { isToInputFocused.current = true; }}
+                  onBlur={() => { isToInputFocused.current = false; }}
+                  placeholder="0,00"
+                  className="font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600 min-w-0 w-full sm:flex-1 max-w-[calc(100%-90px)] sm:max-w-none h-5 border-0 outline-none bg-transparent placeholder-wl-neutral-400"
+                />
+              ) : (
+                <span className="min-w-0 w-full sm:flex-1 max-w-[calc(100%-90px)] sm:max-w-none font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600">
+                  {rawToInput}
+                </span>
+              )}
+              <div className="shrink-0 ml-2">
+                <CurrencyInputDropdown
+                  currency={toCurrency}
+                  currencies={currencies}
+                  onCurrencyChange={onToCurrencyChange}
+                />
               </div>
-            </>
-          ) : (
-            <>
-              <div 
-                className="w-full px-3 sm:px-4" 
-                style={{ ...titleWrapperStyles, textAlign: 'justify' }}
-              >
-                <h2 
-                  ref={titleRefWeb}
-                  className="font-inter font-medium text-xl leading-7 tracking-tight-xs text-wl-neutral-950 m-0"
-                  style={{ ...titleStyles, textAlign: 'justify' }}
-                >
-                  Conversor de moedas
-                </h2>
-              </div>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 w-full">
-                {/* Input FROM */}
-                <div 
-                  ref={fromInputContainerRefWeb}
-                  className="flex flex-row items-center flex-1 min-w-0 h-11 px-4 py-3 bg-white border-2 rounded-2xl shadow-md transition-all overflow-hidden" 
-                  style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}
-                >
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    id="currency-converter-from-input-web"
-                    name="fromValue"
-                    value={rawFromInput}
-                    onChange={handleInputChange}
-                    onFocus={() => { isFromInputFocused.current = true; }}
-                    onBlur={() => { isFromInputFocused.current = false; }}
-                    placeholder="0,00"
-                    className="font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600 min-w-0 flex-1 h-5 border-0 outline-none bg-transparent placeholder-wl-neutral-400"
-                  />
-                  <div className="shrink-0 ml-2">
-                    <InputCurrencyDropdown
-                      currency={fromCurrency}
-                      currencies={currencies}
-                      onCurrencyChange={onFromCurrencyChange}
-                    />
-                  </div>
-                </div>
+            </div>
+          </div>
 
-                <div className="flex justify-center sm:justify-start">
-                  <SwapButtonWeb onClick={handleSwapClick} />
-                </div>
-
-                {/* Input TO */}
-                <div 
-                  ref={toInputContainerRefWeb}
-                  className="flex flex-row items-center flex-1 min-w-0 h-11 px-4 py-3 bg-white border-2 rounded-2xl shadow-md transition-all overflow-hidden" 
-                  style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}
-                >
-                  {onToValueChange ? (
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      id="currency-converter-to-input-web"
-                      name="toValue"
-                      value={rawToInput}
-                      onChange={handleToInputChange}
-                      onFocus={() => { isToInputFocused.current = true; }}
-                      onBlur={() => { isToInputFocused.current = false; }}
-                      placeholder="0,00"
-                      className="font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600 min-w-0 flex-1 h-5 border-0 outline-none bg-transparent placeholder-wl-neutral-400"
-                    />
-                  ) : (
-                    <span className="min-w-0 flex-1 font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600">
-                      {rawToInput}
-                    </span>
-                  )}
-                  <div className="shrink-0 ml-2">
-                    <InputCurrencyDropdown
-                      currency={toCurrency}
-                      currencies={currencies}
-                      onCurrencyChange={onToCurrencyChange}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center gap-2 w-full" key={`summary-${fromValue}-${toValue}-${fromCurrency.code}-${toCurrency.code}`}>
-                {/* Linha de resumo: "R$ X = $ Y" */}
-                <div className="flex flex-row flex-wrap justify-center items-center gap-2 w-full px-2">
-                  <span className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl leading-8 sm:leading-9 lg:leading-10 tracking-tight-md text-wl-neutral-600 text-center whitespace-nowrap" key={`from-${displayFrom}-${fromCurrency.code}`}>
-                    {fromCurrency.symbol} {displayFrom}
-                  </span>
-                  <span className="font-inter font-semibold text-xl sm:text-2xl leading-7 sm:leading-8 tracking-tight-sm text-wl-neutral-600 whitespace-nowrap">
-                    =
-                  </span>
-                  <span className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl leading-8 sm:leading-9 lg:leading-10 tracking-tight-md text-wl-neutral-600 text-center whitespace-nowrap" key={`to-${displayTo}-${toCurrency.code}`}>
-                    {toCurrency.symbol} {displayTo}
-                  </span>
-                </div>
-                {/* Taxa de câmbio base e data de atualização */}
-                <div className="flex flex-col gap-1 w-full">
-                  <p className="font-inter font-normal text-xs leading-4 text-wl-neutral-600 text-center m-0 px-2 whitespace-nowrap">
-                    1 {fromCurrency.code} = {rate.toFixed(2)} {toCurrency.code} em {lastUpdatedLabel}
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
+          <div className="flex flex-col items-center gap-1 sm:gap-2 w-full" key={`summary-${fromValue}-${toValue}-${fromCurrency.code}-${toCurrency.code}`}>
+            <div className="flex flex-row flex-wrap justify-center items-center gap-2 w-full px-2">
+              <span className="font-inter font-bold text-xl sm:text-2xl lg:text-3xl xl:text-4xl leading-7 sm:leading-8 lg:leading-9 xl:leading-10 tracking-tight-md text-wl-neutral-600 text-center whitespace-nowrap" key={`from-${displayFrom}-${fromCurrency.code}`}>
+                {fromCurrency.symbol} {displayFrom}
+              </span>
+              <span className="font-inter font-semibold text-lg sm:text-xl lg:text-2xl leading-6 sm:leading-7 lg:leading-8 tracking-tight-sm text-wl-neutral-600 whitespace-nowrap">
+                =
+              </span>
+              <span className="font-inter font-bold text-xl sm:text-2xl lg:text-3xl xl:text-4xl leading-7 sm:leading-8 lg:leading-9 xl:leading-10 tracking-tight-md text-wl-neutral-600 text-center whitespace-nowrap" key={`to-${displayTo}-${toCurrency.code}`}>
+                {toCurrency.symbol} {displayTo}
+              </span>
+            </div>
+            <p className="font-inter font-normal text-xs leading-4 text-wl-neutral-600 text-center m-0 px-2 whitespace-nowrap">
+              1 {fromCurrency.code} = {rate.toFixed(2)} {toCurrency.code} em {lastUpdatedLabel}
+            </p>
+          </div>
         </>
       )}
     </div>

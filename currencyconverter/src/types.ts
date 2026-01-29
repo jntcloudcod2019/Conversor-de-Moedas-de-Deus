@@ -41,13 +41,11 @@ export interface CurrencyConverterProps {
   rate?: number; // Opcional: pode ser calculado a partir de exchangeRates
   currencies: Currency[];
   exchangeRates?: Record<string, number>; // Taxas de câmbio da API (gerado pelo AutoMapper)
-  device?: Device;
   lastUpdated?: string;
   onFromValueChange: (value: number) => void;
   onToValueChange?: (value: number) => void;
   onFromCurrencyChange: (currency: Currency) => void;
   onToCurrencyChange: (currency: Currency) => void;
-  onSwap: (payload: SwapPayload) => void;
   // Opção alternativa: receber o objeto completo do AutoMapper
   converterData?: CurrencyConverterData;
   // Moedas para buscar da API na inicialização
