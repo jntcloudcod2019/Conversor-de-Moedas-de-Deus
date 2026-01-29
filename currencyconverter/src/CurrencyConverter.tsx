@@ -34,7 +34,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
   const [loadedData, setLoadedData] = React.useState<CurrencyConverterData | null>(null);
   const [hasTriedLoadApi, setHasTriedLoadApi] = React.useState(false);
   const retryTimeoutRef = React.useRef<number | null>(null);
-  const debugDelayTimeoutRef = React.useRef<number | null>(null);
   const { isLoading, setIsLoading } = useSkeletonService();
   
   // Estilos inline para prevenir truncamento - aplicados diretamente no JSX, sem timeouts
@@ -100,91 +99,28 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
     const observerMobile = observeAndProtect(titleRefMobile.current);
     const observerWeb = observeAndProtect(titleRefWeb.current);
 
-    // Verifica periodicamente (fallback caso o observer não capture)
-    const intervalId = setInterval(() => {
-      protectTitle(titleRefMobile.current);
-      protectTitle(titleRefWeb.current);
-    }, 100);
-
-    return () => {
-      observerMobile?.disconnect();
-      observerWeb?.disconnect();
-      clearInterval(intervalId);
-    };
-  }, [isLoading]);
-
-  React.useLayoutEffect(() => {
-    // #region agent log: useLayoutEffect entry
-    fetch('http://127.0.0.1:7242/ingest/91c52393-f929-4d82-9177-ae45437553d5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CurrencyConverter.tsx:useLayoutEffect',message:'useLayoutEffect ENTRY',data:{hasConverterData:!!converterData,hasLoadedData:!!loadedData,hasTriedLoadApi,currencyCodesToFetchLength:currencyCodesToFetch.length,note:'Entrada do useLayoutEffect'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SKELETON-FLOW'})}).catch(()=>{});
-    // #endregion
-
-    // FORÇA skeleton por 1.5s para teste (mesmo se tiver converterData)
     setIsLoading(true);
+    setHasTriedLoadApi(true);
     
-    // #region agent log: Skeleton - forcing loading state for test
-    fetch('http://127.0.0.1:7242/ingest/91c52393-f929-4d82-9177-ae45437553d5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CurrencyConverter.tsx:useLayoutEffect',message:'Skeleton - forcing loading state for test',data:{isLoading:true,hasConverterData:!!converterData,hasLoadedData:!!loadedData,currencyCodesToFetch,note:'FORÇANDO isLoading=true por 1.5s para testar skeleton'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SKELETON-LOAD'})}).catch(()=>{});
-    // #endregion
-    
-    // Delay para testar skeleton (1.5 segundos) - SEMPRE executa para testar
-    debugDelayTimeoutRef.current = window.setTimeout(() => {
-      // #region agent log: Skeleton - delay ended, hiding skeleton
-      fetch('http://127.0.0.1:7242/ingest/91c52393-f929-4d82-9177-ae45437553d5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CurrencyConverter.tsx:useLayoutEffect',message:'Skeleton - delay ended, hiding skeleton',data:{delay:1500,hasConverterData:!!converterData,hasLoadedData:!!loadedData,note:'Delay de 1.5s terminou, escondendo skeleton'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SKELETON-DELAY'})}).catch(()=>{});
-      // #endregion
-      
-      // Após o delay, verifica os dados normalmente
-      if (converterData) {
+    currencyService
+      .getCurrencyConverterData([...currencyCodesToFetch], 'USD')
+      .then((data: CurrencyConverterData | null) => {
         setIsLoading(false);
+        if (data) setLoadedData(data);
         if (retryTimeoutRef.current) {
           clearTimeout(retryTimeoutRef.current);
           retryTimeoutRef.current = null;
         }
-        return;
-      }
-      if (loadedData) {
+      })
+      .catch(() => {
         setIsLoading(false);
-        if (retryTimeoutRef.current) {
-          clearTimeout(retryTimeoutRef.current);
-          retryTimeoutRef.current = null;
-        }
-        return;
-      }
-      if (currencyCodesToFetch.length === 0) {
-        setIsLoading(false);
-        return;
-      }
-      if (hasTriedLoadApi) {
-        setIsLoading(false);
-        return;
-      }
-
-      setHasTriedLoadApi(true);
-      
-      currencyService
-        .getCurrencyConverterData([...currencyCodesToFetch], 'USD')
-        .then((data: CurrencyConverterData | null) => {
-          // #region agent log: Skeleton - API success, hiding skeleton
-          fetch('http://127.0.0.1:7242/ingest/91c52393-f929-4d82-9177-ae45437553d5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CurrencyConverter.tsx:useLayoutEffect',message:'Skeleton - API success, hiding skeleton',data:{hasData:!!data,note:'API retornou dados, escondendo skeleton'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SKELETON-API'})}).catch(()=>{});
-          // #endregion
-          setIsLoading(false);
-          if (data) setLoadedData(data);
-          if (retryTimeoutRef.current) {
-            clearTimeout(retryTimeoutRef.current);
-            retryTimeoutRef.current = null;
-          }
-        })
-        .catch(() => {
+        setHasTriedLoadApi(false);
+        retryTimeoutRef.current = window.setTimeout(() => {
           setHasTriedLoadApi(false);
-          retryTimeoutRef.current = window.setTimeout(() => {
-            setHasTriedLoadApi(false);
-          }, 3000);
-        });
-    }, 1500);
+        }, 3000);
+      });
 
     return () => {
-      if (debugDelayTimeoutRef.current) {
-        clearTimeout(debugDelayTimeoutRef.current);
-        debugDelayTimeoutRef.current = null;
-      }
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
         retryTimeoutRef.current = null;
@@ -220,7 +156,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
   );
 
   React.useEffect(() => {
-    
     if (propRate !== undefined) {
       setRate(propRate);
       return;
@@ -269,7 +204,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
     setRawToInput(raw);
 
     if (raw.trim() === "" || raw === decimalSeparator) {
-     
       onToValueChange(0);
       return;
     }
@@ -296,8 +230,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
     : device === "web" 
     ? false 
     : detectedDevice === "mobile";
-  
-
   const isFromInputFocused = React.useRef(false);
   const isToInputFocused = React.useRef(false);
   
@@ -369,6 +301,7 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
   };
 
   // Componente SkeletonElement com animação
+  // Componente SkeletonElement com animação
   const SkeletonElement: React.FC<{ 
     width?: string | number; 
     height?: string | number; 
@@ -397,7 +330,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
     );
   };
 
-  
   const containerClassName = isMobile
     ? "flex flex-col gap-5 bg-white border-2 border-wl-neutral-200 rounded-2xl shadow-lg w-full max-w-md mx-auto p-4 sm:p-6 overflow-visible"
     : "flex flex-col gap-5 bg-white border-2 border-wl-neutral-200 rounded-2xl shadow-lg w-full max-w-6xl mx-auto p-4 sm:p-6 overflow-visible";
@@ -408,34 +340,14 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
     boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
   };
 
-  // #region agent log: Skeleton render decision and DOM verification
-  React.useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/91c52393-f929-4d82-9177-ae45437553d5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CurrencyConverter.tsx:render',message:'Skeleton render decision',data:{isLoading,isMobile,hasConverterData:!!converterData,hasLoadedData:!!loadedData,willShowSkeleton:isLoading,note:'Decisão de renderização: skeleton ou conteúdo real'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SKELETON-RENDER'})}).catch(()=>{});
-    
-    // Verifica se os elementos skeleton estão no DOM
-    if (isLoading) {
-      setTimeout(() => {
-        const skeletonElements = document.querySelectorAll('[role="status"][aria-label="Carregando..."]');
-        fetch('http://127.0.0.1:7242/ingest/91c52393-f929-4d82-9177-ae45437553d5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CurrencyConverter.tsx:render',message:'Skeleton DOM verification',data:{skeletonElementsCount:skeletonElements.length,isLoading,isMobile,note:'Verificando se elementos skeleton estão no DOM'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SKELETON-DOM'})}).catch(()=>{});
-      }, 100);
-    }
-  }, [isLoading, isMobile, converterData, loadedData]);
-  // #endregion
 
   return (
     <div className={containerClassName} style={containerStyle}>
       {/* Se estiver carregando (skeleton service), mostra o skeleton */}
       {isLoading ? (
         <>
-          {(() => {
-            // #region agent log: Skeleton mobile render
-            fetch('http://127.0.0.1:7242/ingest/91c52393-f929-4d82-9177-ae45437553d5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CurrencyConverter.tsx:render-skeleton-mobile',message:'Skeleton mobile render',data:{isLoading,isMobile,note:'Renderizando skeleton versão mobile'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SKELETON-MOBILE'})}).catch(()=>{});
-            // #endregion
-            return null;
-          })()}
           {isMobile ? (
             <>
-              {/* Skeleton Título */}
               <div className="w-full px-3 sm:px-4">
                 <SkeletonElement variant="text" width="60%" height="28px" />
               </div>
@@ -473,13 +385,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
             </>
           ) : (
             <>
-              {(() => {
-                // #region agent log: Skeleton web render
-                fetch('http://127.0.0.1:7242/ingest/91c52393-f929-4d82-9177-ae45437553d5',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CurrencyConverter.tsx:render-skeleton-web',message:'Skeleton web render',data:{isLoading,isMobile,note:'Renderizando skeleton versão web'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'SKELETON-WEB'})}).catch(()=>{});
-                // #endregion
-                return null;
-              })()}
-              {/* Skeleton Título */}
               <div 
                 className="w-full px-3 sm:px-4" 
                 style={{ ...titleWrapperStyles, textAlign: 'justify' }}
@@ -568,7 +473,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
                     currency={fromCurrency}
                     currencies={currencies}
                     onCurrencyChange={onFromCurrencyChange}
-                    exchangeRates={exchangeRates}
                   />
                 </div>
 
@@ -596,7 +500,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
                     currency={toCurrency}
                     currencies={currencies}
                     onCurrencyChange={onToCurrencyChange}
-                    exchangeRates={exchangeRates}
                   />
                 </div>
 
@@ -649,7 +552,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
                       currency={fromCurrency}
                       currencies={currencies}
                       onCurrencyChange={onFromCurrencyChange}
-                      exchangeRates={exchangeRates}
                     />
                   </div>
                 </div>
@@ -687,7 +589,6 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
                       currency={toCurrency}
                       currencies={currencies}
                       onCurrencyChange={onToCurrencyChange}
-                      exchangeRates={exchangeRates}
                     />
                   </div>
                 </div>
