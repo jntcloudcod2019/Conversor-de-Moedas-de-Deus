@@ -1,0 +1,144 @@
+/* Container raiz: ancora o popover exatamente sob o gatilho/input */
+.cs-root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* Trigger compacto (flag + sigla + chevron) */
+.cs-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+}
+
+/* Bandeira circular 20x20 (mascara) */
+.cs-flag {
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+}
+
+/* Aumenta levemente o SVG interno apenas no trigger para preencher o círculo */
+.cs-trigger .cs-flag > svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Sigla (3 letras) */
+.cs-code {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 20px;
+  color: #525252;
+}
+
+/* Botão do chevron (20x20) */
+.cs-chevron {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Lista semântica */
+.cs-list {
+  margin: 0;
+  padding: 2px; /* compacta o padding geral da lista */
+  list-style: none;
+  max-height: 500px;
+  overflow-y: visible; /* scroll ficará no popover */
+}
+
+/* Item da lista: flag + sigla (compacto) */
+.cs-option {
+  display: flex;
+  align-items: center;
+  gap: 2px; /* reduz o espaço entre flag e sigla */
+  padding: 4px 6px; /* reduz o padding do item */
+  border-radius: 4px;
+  background: #ffffff; /* fundo branco para itens do listbox (botões) */
+  cursor: pointer;
+  color: #f8f6f6;
+  user-select: none;
+  
+}
+
+.cs-option:hover,
+.cs-option[aria-selected="true"],
+.cs-option[data-active="true"] {
+  background: #F5F5F5;
+}
+
+/* Flag dentro dos itens da lista: menor e redonda */
+.cs-popover .cs-flag {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px; /* evita deformação dentro do item */
+}
+
+/* SVG da bandeira "zoomado" para preencher o círculo dos itens */
+.cs-popover .cs-flag > svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Sigla dentro do item: tipografia compacta */
+.cs-option-code {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 14px;
+  color: #525252;
+}
+
+/* Popover: garante fundo branco e scroll */
+.cs-popover {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 36px); /* desloca bem abaixo do input/trigger */
+  left: auto;
+  right: -12px;           /* mais à direita */
+  min-width: 220px;
+  width: max-content; /* acompanha trigger e não invade input */
+  max-height: 240px;
+  overflow-y: auto; /* scroll dentro do listbox, canto direito */
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  display: block;
+
+  /* scroll cinza claro sempre visível à direita */
+  scrollbar-width: thin;
+  scrollbar-color: #4b4949 transparent;
+}
+
+.cs-popover::-webkit-scrollbar {
+  width: 8px;
+}
+.cs-popover::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cs-popover::-webkit-scrollbar-thumb {
+  background: #dcdcdc;
+  border-radius: 4px;
+}
+

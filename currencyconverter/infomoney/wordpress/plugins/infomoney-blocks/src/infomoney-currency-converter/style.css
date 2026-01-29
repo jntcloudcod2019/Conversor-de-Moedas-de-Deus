@@ -1,0 +1,115 @@
+.infomoney-currency-converter-block {
+  /* Estilos do wrapper; o CSS real vem do design system. */
+}
+
+/* Permitir que o componente use seu max-w-4xl corretamente */
+.wp-block-infomoney-currency-converter {
+  width: 100%;
+  /* Não limitar max-width aqui - deixar o componente usar suas próprias classes */
+}
+
+.wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper {
+  width: 100% !important;
+  max-width: none !important;
+  display: flex !important;
+  justify-content: center !important;
+  /* Permitir que o componente interno use max-w-4xl */
+}
+
+/* Garantir que o componente React use max-w-4xl na versão web */
+.wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper > div[class*="max-w-4xl"] {
+  max-width: 56rem !important; /* 896px - equivalente ao max-w-4xl do Tailwind */
+  width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Garantir que o componente React use max-w-md na versão mobile */
+.wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper > div[class*="max-w-md"] {
+  max-width: 28rem !important; /* 448px - equivalente ao max-w-md do Tailwind */
+  width: 100% !important;
+}
+
+/* Fallback quando JS está desativado (noscript) – definido no bloco */
+.infomoney-cc-noscript {
+  padding: 1rem;
+  margin: 0;
+  font-size: 0.875rem;
+  color: #374151;
+  background: #f3f4f6;
+  border-radius: 0.5rem;
+}
+
+/* Fallback HTML estático - exibido enquanto React carrega ou se falhar */
+.infomoney-cc-fallback {
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.infomoney-cc-fallback[data-error] {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.infomoney-cc-fallback-title {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.infomoney-cc-fallback-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.infomoney-cc-fallback-message {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.infomoney-cc-fallback[data-error] .infomoney-cc-fallback-message {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.infomoney-cc-fallback-info {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* Ocultar fallback quando React carregar com sucesso */
+.infomoney-cc-loaded .infomoney-cc-fallback {
+  display: none !important;
+}
+
+/* Estado de erro no container */
+.wp-block-infomoney-currency-converter.infomoney-cc-error {
+  border: 1px solid #fca5a5;
+}
+
+/* Noscript - quando JS está completamente desativado */
+.infomoney-cc-noscript {
+  padding: 1rem;
+  margin: 0;
+  font-size: 0.875rem;
+  color: #374151;
+  background: #f3f4f6;
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+.infomoney-cc-noscript-message {
+  margin: 0;
+}

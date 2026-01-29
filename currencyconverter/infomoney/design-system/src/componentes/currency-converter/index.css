@@ -1,0 +1,197 @@
+@import "tailwindcss";
+
+/* Importar fonte Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Reset para garantir que as classes do componente funcionem */
+.infomoney-currency-converter-wrapper {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Garantir que o wrapper não limite o tamanho do componente */
+  width: 100%;
+  box-sizing: border-box;
+  /* Permitir que o componente interno use seu max-w-6xl */
+  display: flex;
+  justify-content: center;
+}
+
+/* Permitir que o componente interno use max-w-6xl (web) ou max-w-md (mobile) */
+.infomoney-currency-converter-wrapper > * {
+  width: 100% !important;
+  max-width: none !important;
+  /* Não forçar max-width aqui - deixar o componente usar suas próprias classes Tailwind */
+}
+
+/* Garantir que max-w-4xl funcione na versão web - maior especificidade */
+.infomoney-currency-converter-wrapper > div[class*="max-w-4xl"] {
+  width: 100% !important;
+  max-width: 56rem !important; /* 896px - equivalente a max-w-4xl */
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Garantir que max-w-md funcione na versão mobile */
+.infomoney-currency-converter-wrapper > div[class*="max-w-md"] {
+  width: 100% !important;
+  max-width: 28rem !important; /* 448px - equivalente a max-w-md */
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Animação de skeleton wave */
+@keyframes skeleton-wave {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton-wave {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0px,
+    #e0e0e0 40px,
+    #f0f0f0 80px
+  );
+  background-size: 200px 100%;
+  animation: skeleton-wave 1.5s ease-in-out infinite;
+}
+
+@media (prefers-color-scheme: dark) {
+  .skeleton-wave {
+    background: linear-gradient(
+      90deg,
+      #2a2a2a 0px,
+      #3a3a3a 40px,
+      #2a2a2a 80px
+    );
+    background-size: 200px 100%;
+  }
+}
+
+/* Utilitários globais de responsividade */
+@media (max-width: 639px) {
+  .responsive-text-xs { font-size: 0.75rem; }
+  .responsive-text-sm { font-size: 0.875rem; }
+  .responsive-text-base { font-size: 1rem; }
+  .responsive-text-lg { font-size: 1.125rem; }
+  .responsive-text-xl { font-size: 1.25rem; }
+  .responsive-text-2xl { font-size: 1.5rem; }
+  .responsive-text-3xl { font-size: 1.875rem; }
+  .responsive-text-4xl { font-size: 2rem; }
+}
+
+@media (min-width: 640px) {
+  .responsive-text-xs { font-size: 0.75rem; }
+  .responsive-text-sm { font-size: 0.875rem; }
+  .responsive-text-base { font-size: 1rem; }
+  .responsive-text-lg { font-size: 1.125rem; }
+  .responsive-text-xl { font-size: 1.25rem; }
+  .responsive-text-2xl { font-size: 1.75rem; }
+  .responsive-text-3xl { font-size: 2.25rem; }
+  .responsive-text-4xl { font-size: 2.5rem; }
+}
+
+@media (min-width: 1024px) {
+  .responsive-text-xs { font-size: 0.75rem; }
+  .responsive-text-sm { font-size: 0.875rem; }
+  .responsive-text-base { font-size: 1rem; }
+  .responsive-text-lg { font-size: 1.125rem; }
+  .responsive-text-xl { font-size: 1.25rem; }
+  .responsive-text-2xl { font-size: 2rem; }
+  .responsive-text-3xl { font-size: 2.5rem; }
+  .responsive-text-4xl { font-size: 3rem; }
+}
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}
+
+/* Override para botões icon (chevron, etc) - sem background */
+button[aria-label="Abrir dropdown"],
+button.chevron-button,
+button[aria-label="Trocar moedas"] {
+  background-color: transparent !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+button[aria-label="Abrir dropdown"]:focus,
+button[aria-label="Abrir dropdown"]:focus-visible,
+button.chevron-button:focus,
+button.chevron-button:focus-visible,
+button[aria-label="Trocar moedas"]:focus,
+button[aria-label="Trocar moedas"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}

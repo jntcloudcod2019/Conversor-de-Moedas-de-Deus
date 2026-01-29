@@ -1,0 +1,14 @@
+{
+  "name": "infomoney-currency-converter",
+  "core": "latest",
+  "phpVersion": "8.2",
+  "config": {
+    "WP_DEBUG": true,
+    "SCRIPT_DEBUG": true
+  },
+  "plugins": [
+    "./infomoney/wordpress/plugins/infomoney-blocks"
+  ],
+  "themes": [],
+  "mappings": {}
+}

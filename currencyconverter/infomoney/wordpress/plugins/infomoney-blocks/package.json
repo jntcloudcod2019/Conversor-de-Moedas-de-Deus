@@ -1,0 +1,14 @@
+{
+  "name": "infomoney-blocks",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "wp-scripts build",
+    "postbuild": "cp src/infomoney-currency-converter/render.php build/infomoney-currency-converter/render.php",
+    "start": "wp-scripts start",
+    "packages-update": "wp-scripts packages-update"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^27.0.0"
+  }
+}

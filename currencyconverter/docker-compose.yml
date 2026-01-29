@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  wordpress:
+    image: wordpress:latest
+    container_name: infomoney-wp
+    restart: unless-stopped
+    ports:
+      - "8888:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: 1
+      WORDPRESS_DEBUG_LOG: 1
+      WORDPRESS_DEBUG_DISPLAY: 1
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./infomoney/wordpress/plugins/infomoney-blocks:/var/www/html/wp-content/plugins/infomoney-blocks
+      - ./infomoney/wordpress/themes/infomoney:/var/www/html/wp-content/themes/infomoney
+    depends_on:
+      - db
+    networks:
+      - wordpress-network
+
+  db:
+    image: mysql:8.0
+    container_name: infomoney-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+      MYSQL_ROOT_PASSWORD: rootpassword
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - wordpress-network
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: infomoney-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: wordpress
+      PMA_PASSWORD: wordpress
+    depends_on:
+      - db
+    networks:
+      - wordpress-network
+
+volumes:
+  wordpress_data:
+  db_data:
+
+networks:
+  wordpress-network:
+    driver: bridge

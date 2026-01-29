@@ -1,0 +1,12 @@
+/* InputcurrencyDropdown.css */
+
+/* ChevronDownIcon base class */
+.chevron-down-icon {
+  --icon-size: 20px;
+  --icon-color: #888888;
+  --icon-mask-url: url("../../assets/chevron-down.svg");
+
+  background-color: var(--icon-color);
+  mask: var(--icon-mask-url) center / contain no-repeat;
+  -webkit-mask: var(--icon-mask-url) center / contain no-repeat;
+}
