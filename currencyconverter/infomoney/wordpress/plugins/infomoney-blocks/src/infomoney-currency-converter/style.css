@@ -2,7 +2,7 @@
   /* Estilos do wrapper; o CSS real vem do design system. */
 }
 
-/* No editor WP: nenhum elemento atrás do botão dropdown (célula e wrapper opacos por cima) */
+/* No editor e no front: nenhum elemento atrás do botão dropdown (célula, wrapper e combobox opacos) */
 .wp-block-infomoney-currency-converter .infomoney-cc-dropdown-cell,
 .wp-block-infomoney-currency-converter .infomoney-cc-currency-dropdown-wrapper {
   background: #ffffff !important;
@@ -12,6 +12,16 @@
 .wp-block-infomoney-currency-converter .infomoney-cc-dropdown-cell {
   position: relative;
   z-index: 9998;
+  isolation: isolate;
+}
+.wp-block-infomoney-currency-converter .infomoney-cc-currency-dropdown-wrapper {
+  isolation: isolate;
+  z-index: 9998;
+}
+.wp-block-infomoney-currency-converter .infomoney-cc-currency-dropdown-wrapper [role="combobox"] {
+  background: #ffffff !important;
+  position: relative;
+  z-index: 10;
 }
 
 /* Container do bloco: largura total; o card interno segue o mesmo tamanho do referência */
