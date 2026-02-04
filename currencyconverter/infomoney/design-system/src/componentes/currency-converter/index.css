@@ -3,6 +3,26 @@
 /* Importar fonte Inter */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* Célula que envolve o dropdown: fundo branco cobre qualquer elemento atrás (borda do container, outline do editor) */
+.infomoney-cc-dropdown-cell {
+  background: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+  position: relative;
+  z-index: 9998;
+  isolation: isolate;
+}
+
+/* Wrapper do dropdown: fundo branco para não deixar nada aparecer atrás do trigger */
+.infomoney-cc-currency-dropdown-wrapper {
+  width: fit-content !important;
+  max-width: 100%;
+  flex-shrink: 0;
+  background: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* Reset para garantir que as classes do componente funcionem */
 .infomoney-currency-converter-wrapper {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;

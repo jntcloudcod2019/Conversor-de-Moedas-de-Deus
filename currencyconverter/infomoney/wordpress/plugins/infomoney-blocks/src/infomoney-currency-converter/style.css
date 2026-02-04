@@ -2,6 +2,18 @@
   /* Estilos do wrapper; o CSS real vem do design system. */
 }
 
+/* No editor WP: nenhum elemento atrás do botão dropdown (célula e wrapper opacos por cima) */
+.wp-block-infomoney-currency-converter .infomoney-cc-dropdown-cell,
+.wp-block-infomoney-currency-converter .infomoney-cc-currency-dropdown-wrapper {
+  background: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.wp-block-infomoney-currency-converter .infomoney-cc-dropdown-cell {
+  position: relative;
+  z-index: 9998;
+}
+
 /* Container do bloco: largura total; o card interno segue o mesmo tamanho do referência */
 .wp-block-infomoney-currency-converter {
   width: 100%;

@@ -2,13 +2,26 @@
  * Wrapper para uso do CurrencyConverter em blocos (ex.: Gutenberg).
  * Gerencia estado (fromValue, toValue, fromCurrency, toCurrency) e repassa
  * config (apiToken, baseCurrency, targetCurrency) para o componente e para a API.
+ * Sincroniza toValue com fromValue * rate para o valor convertido refletir no campo destino e no swap.
  */
 
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { CurrencyConverter } from "./CurrencyConverter";
+import { CurrencyConverter, calculateRateFromExchangeRates, useCurrencyConverterData } from "./CurrencyConverter";
 import type { Currency, CurrencyConverterProps } from "./types";
 import { DEFAULT_CURRENCY_CODES } from "./types";
+
+function getDecimals(code: string): number {
+  const decimals: Record<string, number> = { JPY: 0, KRW: 0 };
+  return decimals[code] ?? 2;
+}
+
+function roundToDecimals(value: number, decimals: number): number {
+  if (!Number.isFinite(value)) return 0;
+  if (decimals <= 0) return Math.round(value);
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
 
 /** Lista de moedas igual ao referência (CurrencyMapper): código, símbolo e nome. */
 const DEFAULT_CURRENCIES: Currency[] = [
@@ -53,6 +66,37 @@ const BlockRoot: React.FC<CurrencyConverterBlockConfig> = (config) => {
   const [toValue, setToValue] = React.useState(0);
   const [fromCurrency, setFromCurrency] = React.useState(initialFrom);
   const [toCurrency, setToCurrency] = React.useState(initialTo);
+  const [rate, setRate] = React.useState(1);
+
+  const { data: loadedData } = useCurrencyConverterData(
+    Array.from(DEFAULT_CURRENCY_CODES),
+    "USD",
+    { apiToken: config.apiToken }
+  );
+  const exchangeRates = loadedData?.exchangeRates;
+
+  React.useEffect(() => {
+    if (!exchangeRates || Object.keys(exchangeRates).length === 0) {
+      setRate(1);
+      return;
+    }
+    calculateRateFromExchangeRates({
+      fromCurrencyCode: fromCurrency.code,
+      toCurrencyCode: toCurrency.code,
+      exchangeRates,
+      fallbackRate: 1,
+    }).then((r) => {
+      if (r != null) setRate(r);
+    });
+  }, [exchangeRates, fromCurrency.code, toCurrency.code]);
+
+  /* Sincroniza valor de destino com origem * taxa (ex.: 67 BRL → 12,73 USD) e reflete no swap */
+  React.useEffect(() => {
+    const toDecimals = getDecimals(toCurrency.code);
+    const effectiveRate = Number.isFinite(rate) && rate > 0 ? rate : 1;
+    const converted = roundToDecimals(fromValue * effectiveRate, toDecimals);
+    setToValue(converted);
+  }, [fromValue, rate, fromCurrency.code, toCurrency.code]);
 
   const props: CurrencyConverterProps = {
     fromValue,
@@ -62,7 +106,7 @@ const BlockRoot: React.FC<CurrencyConverterBlockConfig> = (config) => {
     rate: undefined,
     currencies: DEFAULT_CURRENCIES,
     exchangeRates: undefined,
-    converterData: undefined,
+    converterData: loadedData ?? undefined,
     apiToken: config.apiToken,
     currencyCodesToFetch: Array.from(DEFAULT_CURRENCY_CODES),
     onFromValueChange: setFromValue,

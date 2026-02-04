@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
 import * as Flags from "country-flag-icons/react/3x2";
 import { format, max, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -151,16 +150,16 @@ const CurrencyConverterSkeleton = React.memo(() => (
 ));
 CurrencyConverterSkeleton.displayName = "CurrencyConverterSkeleton";
 
-/* ----- CurrencyInputDropdown / CurrencyDropdown (inlined from CurrencyInput) ----- */
+/* ----- CurrencyInputDropdown: absolute inline no bloco (evita transform do editor WP que quebra fixed) ----- */
 const CurrencyInputDropdown: React.FC<{ currency: Currency; currencies: Currency[]; onCurrencyChange: (currency: Currency) => void }> = ({ currency, currencies, onCurrencyChange }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [listboxWidth, setListboxWidth] = useState<number | null>(null);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const rootRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listboxInnerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const currencyItemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const listboxId = React.useId();
   const sortedCurrencies = useMemo(
     () => (Array.isArray(currencies) ? [...currencies] : []).sort((a, b) => a.code.localeCompare(b.code)),
     [currencies]
@@ -176,7 +175,7 @@ const CurrencyInputDropdown: React.FC<{ currency: Currency; currencies: Currency
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (isOpen && !rootRef.current?.contains(target) && !dropdownRef.current?.contains(target)) {
+      if (isOpen && wrapperRef.current && !wrapperRef.current.contains(target)) {
         setIsOpen(false);
         setActiveIndex(-1);
       }
@@ -188,62 +187,15 @@ const CurrencyInputDropdown: React.FC<{ currency: Currency; currencies: Currency
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) {
-      setActiveIndex(-1);
-      return;
-    }
-    let cancelled = false;
-    let rafId: number;
-    const run = () => {
-      const root = rootRef.current;
-      const listboxInner = listboxInnerRef.current;
-      if (cancelled) return;
-      if (!root || !dropdownRef.current || !listboxInner) {
-        rafId = requestAnimationFrame(run);
-        return;
-      }
-      const innerWidth = listboxInner.scrollWidth;
-      const innerHeight = listboxInner.scrollHeight;
-      const calculatedWidth = Math.max(innerWidth + 2, 100);
-      const triggerRect = root.getBoundingClientRect();
-      const offsetTop = 12;
-      const MARGIN = 8;
-      let left = triggerRect.right - calculatedWidth;
-      let top = triggerRect.bottom + offsetTop;
-      if (left < MARGIN) left = MARGIN;
-      else if (left + calculatedWidth > window.innerWidth - MARGIN) left = window.innerWidth - calculatedWidth - MARGIN;
-      const spaceBelow = window.innerHeight - triggerRect.bottom - offsetTop;
-      if (spaceBelow < innerHeight) top = window.innerHeight - innerHeight - MARGIN;
-      queueMicrotask(() => {
-        if (cancelled) return;
-        setListboxWidth((prev) => (prev === calculatedWidth ? prev : calculatedWidth));
-        setPosition({ top, left });
-        requestAnimationFrame(() => {
-          if (cancelled) return;
-          if (dropdownRef.current) {
-            dropdownRef.current.style.opacity = "0";
-            dropdownRef.current.style.transform = "translateY(-8px) scale(0.98)";
-          }
-          requestAnimationFrame(() => {
-            if (cancelled) return;
-            if (dropdownRef.current) {
-              dropdownRef.current.style.opacity = "1";
-              dropdownRef.current.style.transform = "translateY(0) scale(1)";
-            }
-            const selectedItemRef = currencyItemRefs.current.get(currency.code);
-            if (selectedItemRef) selectedItemRef.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
-            const first = sortedCurrencies[0];
-            if (first) currencyItemRefs.current.get(first.code)?.focus();
-          });
-        });
+    if (!isOpen) return;
+    const first = sortedCurrencies[0];
+    if (first) {
+      requestAnimationFrame(() => {
+        currencyItemRefs.current.get(currency.code)?.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+        currencyItemRefs.current.get(first.code)?.focus();
       });
-    };
-    rafId = requestAnimationFrame(run);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(rafId);
-    };
-  }, [isOpen, currency.code]);
+    }
+  }, [isOpen, currency.code, sortedCurrencies]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!isOpen) return;
@@ -281,18 +233,10 @@ const CurrencyInputDropdown: React.FC<{ currency: Currency; currencies: Currency
     <div
       ref={dropdownRef}
       role="listbox"
-      id="currency-dropdown-listbox"
+      id={listboxId}
       aria-label="Selecionar moeda"
-      className="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-[9999]"
-      style={{
-        position: "fixed",
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        width: listboxWidth ? `${listboxWidth}px` : "auto",
-        minWidth: "100px",
-        maxHeight: "400px",
-        opacity: position.top === 0 && position.left === 0 ? 0 : undefined,
-      }}
+      className="absolute left-0 top-full bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] min-w-[100px] max-h-[400px] overflow-auto"
+      style={{ marginTop: "6px" }}
     >
       <div ref={listboxInnerRef} className="py-1">
         {sortedCurrencies.map((curr, idx) => {
@@ -321,17 +265,21 @@ const CurrencyInputDropdown: React.FC<{ currency: Currency; currencies: Currency
   ) : null;
 
   return (
-    <>
+    <div
+      ref={wrapperRef}
+      className="infomoney-cc-currency-dropdown-wrapper relative inline-block shrink-0"
+      style={{ overflow: "visible", width: "fit-content", maxWidth: "100%", background: "#ffffff", border: "none", boxShadow: "none" }}
+    >
       <div
         ref={rootRef}
         role="combobox"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-label="Selecionar moeda"
-        aria-controls="currency-dropdown-listbox"
+        aria-controls={listboxId}
         tabIndex={0}
-        className="relative w-auto min-w-[90px] sm:min-w-[100px] h-5 flex items-center justify-end gap-1 shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
-        style={{ overflow: "visible" }}
+        className="relative w-auto min-w-[90px] sm:min-w-[100px] h-5 flex items-center justify-end gap-1 shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded z-10 bg-white"
+        style={{ overflow: "visible", backgroundColor: "#ffffff" }}
         onClick={(e) => {
           e.stopPropagation();
           requestAnimationFrame(() => setIsOpen((prev) => !prev));
@@ -340,21 +288,12 @@ const CurrencyInputDropdown: React.FC<{ currency: Currency; currencies: Currency
       >
         <div className="w-5 h-5 shrink-0 rounded-full overflow-hidden flex items-center justify-center"><FlagIcon countryCode={getCountryCodeByCurrency(currency.code)} /></div>
         <span className="font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600 whitespace-nowrap" style={{ minWidth: "fit-content" }}>{currency.code}</span>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            requestAnimationFrame(() => setIsOpen((prev) => !prev));
-          }}
-          className="cursor-pointer bg-transparent border-0 p-0 m-0 outline-none"
-          aria-label="Abrir menu de seleção de moeda"
-          aria-expanded={isOpen}
-        >
+        <span className="inline-flex items-center justify-center pointer-events-none" aria-hidden="true">
           <ChevronIcon color="#525252" />
-        </button>
+        </span>
       </div>
-      {typeof document !== "undefined" && createPortal(listboxContent, document.body)}
-    </>
+      {listboxContent}
+    </div>
   );
 };
 
@@ -700,6 +639,7 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
 
     if (raw.trim() === "" || raw === decimalSeparator) {
       onToValueChange(0);
+      onFromValueChange(0);
       return;
     }
 
@@ -711,10 +651,15 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
     
     if (Number.isNaN(numeric)) {
       onToValueChange(0);
+      onFromValueChange(0);
       return;
     }
 
     onToValueChange(numeric);
+    /* Conversão inversa: manter "from" em sync quando o usuário edita "to" */
+    const effectiveRate = Number.isFinite(rate) && rate > 0 ? rate : 1;
+    const fromDec = getDecimals(fromCurrency.code);
+    onFromValueChange(roundToDecimals(numeric / effectiveRate, fromDec));
   };
 
   const isFromInputFocused = React.useRef(false);
@@ -802,7 +747,7 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
           <div className="flex flex-col sm:flex-row items-center sm:items-stretch gap-2 sm:gap-4 sm:gap-6 w-full">
             <div 
               ref={fromInputContainerRef}
-              className="flex flex-row items-center w-full sm:flex-1 min-w-0 h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md relative transition-all overflow-hidden" 
+              className="flex flex-row items-center w-full sm:flex-1 min-w-0 h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md relative transition-all overflow-visible" 
               style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}
             >
               <input
@@ -817,7 +762,7 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
                 placeholder={fromPlaceholder}
                 className="font-inter font-semibold text-sm sm:text-base leading-5 text-wl-neutral-600 min-w-0 w-full sm:flex-1 max-w-[calc(100%-90px)] sm:max-w-none h-5 border-0 outline-none bg-transparent placeholder-wl-neutral-400 pl-1 pr-2"
               />
-              <div className="shrink-0 ml-2">
+              <div className="infomoney-cc-dropdown-cell shrink-0 ml-2 relative z-10">
                 <CurrencyInputDropdown
               currency={fromCurrency}
               currencies={currencies}
@@ -832,7 +777,7 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
 
             <div 
               ref={toInputContainerRef}
-              className="flex flex-row items-center w-full sm:flex-1 min-w-0 h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md relative transition-all overflow-hidden" 
+              className="flex flex-row items-center w-full sm:flex-1 min-w-0 h-11 px-3 sm:px-4 py-3 bg-white border-2 rounded-2xl shadow-md relative transition-all overflow-visible" 
               style={{ borderColor: 'rgba(0, 0, 0, 0.35)', borderWidth: '2px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)' }}
             >
               {onToValueChange ? (
@@ -853,7 +798,7 @@ export const CurrencyConverter: React.FC<CurrencyConverterProps> = ({
                   {rawToInput}
                 </span>
               )}
-              <div className="shrink-0 ml-2">
+              <div className="infomoney-cc-dropdown-cell shrink-0 ml-2 relative z-10">
                 <CurrencyInputDropdown
               currency={toCurrency}
               currencies={currencies}
