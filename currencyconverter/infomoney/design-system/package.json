@@ -4,12 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && npm run build:types",
+    "build": "vite build && vite build -c vite.view.config.js && node scripts/fix-css-lint.js && npm run build:types && npm run prerender",
+    "prerender": "vite build -c vite.prerender.config.js && node dist-ssr/prerender-entry.js",
     "build:types": "tsc --project tsconfig.build.json",
-    "dev": "vite build --watch"
+    "dev": "vite build --watch",
+    "sync": "sh sync-from-src.sh",
+    "update-and-build": "npm run sync && npm run build",
+    "build-and-copy": "npm run update-and-build && cp dist/componentes/currency-converter/index.esm.js dist/componentes/currency-converter/index.cjs.js dist/componentes/currency-converter/style.css ../wordpress/plugins/infomoney-blocks/assets/currency-converter/"
   },
   "dependencies": {
     "country-flag-icons": "^1.6.4",
+    "date-fns": "^4.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

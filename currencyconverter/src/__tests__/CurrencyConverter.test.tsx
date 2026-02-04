@@ -11,32 +11,17 @@ vi.mock('../market-data- currency-converter', () => ({
   },
 }))
 
-vi.mock('../utils/calculationsPositionComponents', () => ({
-  calculateRateFromExchangeRates: vi.fn(),
-  calculateExchangeRate: vi.fn().mockResolvedValue('1.00'),
-}))
-
-vi.mock('../utils/dateUtils', () => ({
-  getCurrentDateTime: vi.fn(() => '23/01/2026 às 10:30'),
-}))
-
-vi.mock('../utils/currencyToCountryMap', () => ({
-  getCountryCodeByCurrency: vi.fn((code: string) => {
-    const map: Record<string, string> = {
-      BRL: 'BR',
-      USD: 'US',
-      EUR: 'EU',
-      GBP: 'GB',
-      JPY: 'JP',
-      CNY: 'CN',
-    }
-    return map[code] || 'US'
-  }),
-}))
+vi.mock('../CurrencyConverter', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    calculateRateFromExchangeRates: vi.fn(),
+  }
+})
 
 // Importar os mocks para configurá-los
 import { currencyService } from '../market-data- currency-converter'
-import { calculateRateFromExchangeRates } from '../utils/calculationsPositionComponents'
+import { calculateRateFromExchangeRates } from '../CurrencyConverter'
 
 describe('CurrencyConverter', () => {
   // Suprimir logs de console durante testes

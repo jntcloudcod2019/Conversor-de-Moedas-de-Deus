@@ -83,13 +83,6 @@ export async function setCachedRate(currencyCode: CurrencyCode, data: CurrencyAp
 }
 
 /**
- * Método assíncrono para limpar o cache
- */
-export async function clearCache(): Promise<void> {
-  cache.clear();
-}
-
-/**
  * Constrói os headers da requisição conforme o modelo da API
  */
 function buildRequestHeaders(config: ApiConfig): HeadersInit {
@@ -202,7 +195,7 @@ export async function fetchCurrencyRate(
 /**
  * Request - Busca cotações de múltiplas moedas (em paralelo)
  * IMPORTANTE: Faz todas as requisições em paralelo
- * Exemplo: Para 5 moedas (BRL, USD, EUR, GBP, JPY) = 5 requisições paralelas
+ * Exemplo: Para 6 moedas (BRL, USD, EUR, GBP, JPY, CNY) = 6 requisições paralelas
  * @param currencyCodes - Array de códigos de moedas (CurrencyCode)
  * @param config - Configuração da API
  * @returns Promise com um objeto mapeando código da moeda para os dados da cotação
@@ -233,6 +226,10 @@ export async function fetchMultipleCurrencyRates(
 /**
  * Request - Busca cotações de múltiplas moedas com fila (primeiro que chega, primeiro da lista)
  * Faz requisições em paralelo e enfileira os resultados conforme completam
+ * 
+ * NOTA: Esta função agora tenta usar o CurrencyApiService do WordPress se disponível,
+ * caso contrário usa a implementação padrão com fetch.
+ * 
  * @param currencyCodes - Array de códigos de moedas (CurrencyCode)
  * @param config - Configuração da API
  * @returns Promise com AllCurrenciesContract (dados enfileirados por ordem de chegada)
@@ -241,7 +238,7 @@ export async function fetchMultipleCurrencyRatesWithQueue(
   currencyCodes: CurrencyCode[],
   config: ApiConfig
 ): Promise<AllCurrenciesContract> {
-  // Fila para armazenar resultados conforme chegam (FIFO)
+  // Implementação padrão com fetch
   const queue: Array<{ code: string; apiData: CurrencyApiResponse }> = [];
   
   // Faz todas as requisições em paralelo

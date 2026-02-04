@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { CurrencyMapper, type AllCurrenciesContract } from '../services/currencyMapper';
 import type { CurrencyApiResponse } from '../services/currencyApi';
+import { getCurrencyConverterDataFromAwesomeApi } from '../services/awesomeApi';
 
 /**
  * Configurações de timeout e rate limiting
@@ -471,6 +472,16 @@ class CurrencyService {
     baseCurrency: string = 'USD'
   ): Promise<CurrencyConverterData | null> {
     try {
+      const awesomeApiToken = typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_AWESOMEAPI_TOKEN;
+      if (awesomeApiToken) {
+        const data = await getCurrencyConverterDataFromAwesomeApi(
+          currencyCodes,
+          baseCurrency,
+          awesomeApiToken
+        );
+        if (data) return data;
+      }
+
       const currencyValuesMap = await this.getMultipleCurrencyValues(currencyCodes);
       const currencies: Array<{ code: string; apiData: CurrencyApiResponse }> = [];
       

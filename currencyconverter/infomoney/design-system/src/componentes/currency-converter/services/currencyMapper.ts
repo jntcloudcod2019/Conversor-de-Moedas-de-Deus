@@ -1,5 +1,6 @@
 import { Currency, CurrencyConverterData } from '../types';
 import { CurrencyApiResponse } from './currencyApi';
+import { calculateExchangeRatesFromBidAsk, calculateLatestDate } from '../CurrencyConverter';
 
 /**
  * Contrato que armazena dados de todas as moedas da API
@@ -11,140 +12,132 @@ export interface AllCurrenciesContract {
   }>;
 }
 
-/**
- * AutoMapper - Converte dados da API para o formato usado pelo CurrencyConverter
- * Monta o objeto completo que será passado como props para o componente
- */
-export class CurrencyMapper {
-  /**
-   * Mapeia uma resposta da API para o objeto Currency
-   * Usa os dados reais da API (symbol da resposta)
-   */
-  static mapApiResponseToCurrency(
-    currencyCode: string,
-    apiResponse: CurrencyApiResponse
-  ): Currency {
-    // Usa o symbol da API como código da moeda (dados reais da API)
-    const code = apiResponse.symbol?.toUpperCase() || currencyCode.toUpperCase();
-    
-    // Para símbolo monetário e nome, usa fallback mínimo
-    // (a API não retorna esses dados, apenas o código/symbol)
-    const currencySymbol = this.getCurrencySymbol(code);
-    const currencyName = this.getCurrencyName(code);
-    
-    return {
-      code: code, // Dados da API (apiResponse.symbol)
-      symbol: currencySymbol, // Fallback (API não retorna)
-      name: currencyName, // Fallback (API não retorna)
-    };
-  }
-
-  /**
-   * Obtém o símbolo monetário baseado no código (fallback mínimo)
-   */
-  private static getCurrencySymbol(code: string): string {
-    const symbolMap: Record<string, string> = {
-      BRL: 'R$',
-      USD: '$',
-      EUR: '€',
-      GBP: '£',
-      JPY: '¥',
-    };
-    return symbolMap[code.toUpperCase()] || code;
-  }
-
-  /**
-   * Obtém o nome da moeda baseado no código (fallback mínimo)
-   */
-  private static getCurrencyName(code: string): string {
-    const nameMap: Record<string, string> = {
+/** Perfil de mapeamento: fonte → destino (estilo AutoMapper C#) */
+const CurrencyProfile = {
+  /** Mapa código → símbolo monetário */
+  symbol: (code: string): string =>
+    ({ BRL: 'R$', USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥' }[code?.toUpperCase()] ?? code),
+  /** Mapa código → nome da moeda */
+  name: (code: string): string =>
+    ({
       BRL: 'Real Brasileiro',
       USD: 'Dólar Americano',
       EUR: 'Euro',
       GBP: 'Libra Esterlina',
       JPY: 'Iene Japonês',
-    };
-    return nameMap[code.toUpperCase()] || code;
-  }
+      CNY: 'Yuan Chinês',
+    }[code?.toUpperCase()] ?? code),
+};
 
-  /**
-   * Mapeia múltiplas respostas da API para uma lista de Currency
-   */
-  static mapApiResponsesToCurrencies(
-    apiResponses: Array<{ code: string; apiData: CurrencyApiResponse }>
-  ): Currency[] {
-    return apiResponses.map(({ code, apiData }) =>
-      this.mapApiResponseToCurrency(code, apiData)
-    );
-  }
+/**
+ * CreateMap<CurrencyApiResponse + code, Currency>
+ * Regra explícita: uma entrada da API → Currency
+ */
+function mapToCurrency(code: string, api: CurrencyApiResponse): Currency {
+  const codeNorm = api.symbol?.toUpperCase() || code.toUpperCase();
+  return {
+    code: codeNorm,
+    symbol: CurrencyProfile.symbol(codeNorm),
+    name: CurrencyProfile.name(codeNorm),
+  };
+}
 
-  /**
-   * Converte o contrato AllCurrenciesContract para lista de strings (códigos)
-   */
-  static contractToCurrencyCodeList(contract: AllCurrenciesContract): string[] {
-    return contract.currencies.map((item) => item.code.toUpperCase());
-  }
+/**
+ * CreateMap<AllCurrenciesContract, Currency[]>
+ * Lista de entradas da API → lista de Currency
+ */
+function mapToCurrencyList(contract: AllCurrenciesContract): Currency[] {
+  return contract.currencies.map(({ code, apiData }) => mapToCurrency(code, apiData));
+}
 
-  /**
-   * Converte o contrato AllCurrenciesContract para lista de Currency
-   */
-  static contractToCurrencyList(contract: AllCurrenciesContract): Currency[] {
-    return this.mapApiResponsesToCurrencies(contract.currencies);
-  }
+/**
+ * CreateMap<AllCurrenciesContract, CurrencyConverterData>
+ * Contrato da API → objeto completo do conversor (síncrono, fallback simples)
+ */
+function mapToConverterDataSync(
+  contract: AllCurrenciesContract,
+  baseCurrency: string = 'USD'
+): CurrencyConverterData {
+  const currencies = mapToCurrencyList(contract);
+  const base = contract.currencies.find(
+    (c) => c.apiData.symbol?.toUpperCase() === baseCurrency.toUpperCase()
+  );
+  const baseMid = base ? (base.apiData.bid + base.apiData.ask) / 2 : 1;
+  const exchangeRates: Record<string, number> = {};
+  contract.currencies.forEach(({ apiData }) => {
+    const code = apiData.symbol?.toUpperCase() || '';
+    const mid = (apiData.bid + apiData.ask) / 2;
+    exchangeRates[code] = code === baseCurrency.toUpperCase() ? 1 : mid / baseMid;
+  });
+  const dates = contract.currencies
+    .map((c) => c.apiData.tradeDate)
+    .map((s) => new Date(s))
+    .filter((d) => !isNaN(d.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime());
+  const lastUpdated = dates[0]
+    ? dates[0].toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : new Date().toLocaleString('pt-BR');
 
-  /**
-   * MÉTODO PRINCIPAL: Monta o objeto completo para usar no CurrencyConverter
-   * Converte os dados da API em tudo que o componente precisa
-   */
+  return { currencies, exchangeRates, lastUpdated };
+}
+
+/**
+ * CreateMap<AllCurrenciesContract, CurrencyConverterData> (async)
+ * Usa calculateExchangeRatesFromBidAsk e calculateLatestDate
+ */
+async function mapToConverterDataAsync(
+  contract: AllCurrenciesContract,
+  baseCurrency: string
+): Promise<CurrencyConverterData | null> {
+  const currencies = mapToCurrencyList(contract);
+  const exchangeRatesResult = await calculateExchangeRatesFromBidAsk({
+    currencies: contract.currencies.map((item) => ({
+      code: item.code,
+      apiData: {
+        symbol: item.apiData.symbol,
+        bid: item.apiData.bid,
+        ask: item.apiData.ask,
+      },
+    })),
+    baseCurrency,
+  });
+  if (!exchangeRatesResult) return null;
+
+  const tradeDates = contract.currencies.map((c) => c.apiData.tradeDate);
+  const lastUpdated = await calculateLatestDate({
+    tradeDates,
+    fallbackDate: new Date(),
+  });
+  if (!lastUpdated) return null;
+
+  return {
+    currencies,
+    exchangeRates: exchangeRatesResult.exchangeRates,
+    lastUpdated,
+  };
+}
+
+/**
+ * AutoMapper – mapeia quaisquer moedas usadas; baseCurrency obrigatório (sem default).
+ */
+export class CurrencyMapper {
   static mapContractToConverterData(
     contract: AllCurrenciesContract,
-    baseCurrency: string = 'USD'
+    baseCurrency: string
   ): CurrencyConverterData {
-    // 1. Mapeia as moedas da API para o formato Currency
-    const currencies = this.mapApiResponsesToCurrencies(contract.currencies);
+    return mapToConverterDataSync(contract, baseCurrency);
+  }
 
-    // 2. Calcula as taxas de câmbio baseadas nos dados da API (bid/ask)
-    const exchangeRates: Record<string, number> = {};
-    
-    // Encontra a moeda base
-    const baseCurrencyData = contract.currencies.find(
-      (item) => item.apiData.symbol?.toUpperCase() === baseCurrency.toUpperCase()
-    );
-    
-    // Calcula a média bid/ask da moeda base
-    const baseMidRate = baseCurrencyData
-      ? (baseCurrencyData.apiData.bid + baseCurrencyData.apiData.ask) / 2
-      : 1;
-
-    // Calcula taxas relativas à moeda base
-    contract.currencies.forEach(({ apiData }) => {
-      const code = apiData.symbol?.toUpperCase() || '';
-      const midRate = (apiData.bid + apiData.ask) / 2;
-      
-      // Se for a moeda base, usa 1, senão divide pela base
-      exchangeRates[code] = code === baseCurrency.toUpperCase() ? 1 : midRate / baseMidRate;
-    });
-
-    // 3. Obtém a data mais recente das cotações
-    const latestDate = contract.currencies
-      .map((item) => new Date(item.apiData.tradeDate))
-      .filter((date) => !isNaN(date.getTime()))
-      .sort((a, b) => b.getTime() - a.getTime())[0];
-
-    const lastUpdated = latestDate
-      ? latestDate.toLocaleString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : new Date().toLocaleString('pt-BR');
-
-    return {
-      currencies,
-      exchangeRates,
-      lastUpdated,
-    };
+  static async mapContractToConverterDataAsync(
+    contract: AllCurrenciesContract,
+    baseCurrency: string
+  ): Promise<CurrencyConverterData | null> {
+    return mapToConverterDataAsync(contract, baseCurrency);
   }
 }

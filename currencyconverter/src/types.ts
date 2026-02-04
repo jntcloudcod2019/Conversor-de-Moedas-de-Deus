@@ -16,13 +16,6 @@ export interface Currency {
   name: string;
 }
 
-export interface SwapPayload {
-  fromValue: number;
-  toValue: number;
-  hasFromInput: boolean;
-  hasToInput: boolean;
-}
-
 /**
  * Objeto completo para usar no CurrencyConverter
  * Gerado a partir dos dados da API pelo AutoMapper
@@ -81,3 +74,16 @@ export interface CurrencyValuesResponse {
     hasNextPage: boolean; // Indica se há próxima página
   };
 }
+
+export const currencyToCountryMap: Record<string, string> = {
+  BRL: "BR",
+  USD: "US",
+  EUR: "DE",
+  GBP: "GB",
+  JPY: "JP",
+  CNY: "CN",
+  OJY: "CN",
+};
+
+export const getCountryCodeByCurrency = (currencyCode: string): string =>
+  currencyToCountryMap[currencyCode] || "US";

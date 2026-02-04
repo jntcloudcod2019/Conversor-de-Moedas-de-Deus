@@ -1,1 +1,0 @@
-export { CurrencyConverterSkeleton } from './CurrencyConverterSkeleton';

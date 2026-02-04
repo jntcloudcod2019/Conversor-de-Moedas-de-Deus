@@ -2,32 +2,37 @@
   /* Estilos do wrapper; o CSS real vem do design system. */
 }
 
-/* Permitir que o componente use seu max-w-4xl corretamente */
+/* Container do bloco: largura total; o card interno segue o mesmo tamanho do referência */
 .wp-block-infomoney-currency-converter {
   width: 100%;
-  /* Não limitar max-width aqui - deixar o componente usar suas próprias classes */
 }
 
-.wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper {
+/* Wrapper (se existir) e root: centralizar e não limitar antes do card */
+.wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper,
+.wp-block-infomoney-currency-converter .infomoney-cc-root {
   width: 100% !important;
   max-width: none !important;
   display: flex !important;
   justify-content: center !important;
-  /* Permitir que o componente interno use max-w-4xl */
 }
 
-/* Garantir que o componente React use max-w-4xl na versão web */
-.wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper > div[class*="max-w-4xl"] {
-  max-width: 56rem !important; /* 896px - equivalente ao max-w-4xl do Tailwind */
+/* Card do conversor = mesmo tamanho do referência (max-w-md sm:max-w-6xl) */
+/* Direto no bloco: .infomoney-cc-root > div é o card do CurrencyConverter */
+.wp-block-infomoney-currency-converter .infomoney-cc-root > div,
+.wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper > div[class*="max-w-md"],
+.wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper > div[class*="max-w-6xl"] {
   width: 100% !important;
+  max-width: 28rem !important; /* max-w-md = 448px (mobile, igual referência) */
   margin-left: auto !important;
   margin-right: auto !important;
 }
 
-/* Garantir que o componente React use max-w-md na versão mobile */
-.wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper > div[class*="max-w-md"] {
-  max-width: 28rem !important; /* 448px - equivalente ao max-w-md do Tailwind */
-  width: 100% !important;
+@media (min-width: 640px) {
+  .wp-block-infomoney-currency-converter .infomoney-cc-root > div,
+  .wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper > div[class*="max-w-md"],
+  .wp-block-infomoney-currency-converter .infomoney-currency-converter-wrapper > div[class*="max-w-6xl"] {
+    max-width: 72rem !important; /* sm:max-w-6xl = 1152px (desktop, igual referência) */
+  }
 }
 
 /* Fallback quando JS está desativado (noscript) – definido no bloco */
@@ -87,6 +92,19 @@
   margin: 0;
   font-size: 0.75rem;
   color: #9ca3af;
+}
+
+/* Fallback estático (forma 2) – mesmo visual do fallback principal */
+.infomoney-cc-static-fallback {
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.infomoney-cc-loaded .infomoney-cc-static-fallback {
+  display: none !important;
 }
 
 /* Ocultar fallback quando React carregar com sucesso */

@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import React from 'react'
-import { CurrencyConverter } from './CurrencyConverter'
+import { CurrencyConverter, calculateRateFromExchangeRates } from './CurrencyConverter'
 import { CurrencyMapper } from './services/currencyMapper'
-import { calculateRateFromExchangeRates } from './utils/calculationsPositionComponents'
 import { DEFAULT_CURRENCY_CODES } from './types'
 
 /**
@@ -93,8 +92,8 @@ function App() {
   // Obtém a lista de moedas do AutoMapper - MEMOIZA para evitar recriação
   const currencyList = useMemo(() => converterData.currencies, [converterData]);
   
-  // Flag para testar fluxo de API (mude para true para testar API real)
-  const TEST_API_FLOW = false;
+  // Usa API real quando VITE_AWESOMEAPI_TOKEN está definido no .env
+  const useApiFlow = Boolean(typeof import.meta !== 'undefined' && import.meta.env?.VITE_AWESOMEAPI_TOKEN);
 
   // Função dinâmica para obter moedas iniciais - aceita qualquer combinação
   const getInitialCurrencies = (
@@ -201,8 +200,8 @@ function App() {
         toValue={effectiveToValue}
         fromCurrency={fromCurrency}
         toCurrency={toCurrency}
-        rate={rate}
-        converterData={TEST_API_FLOW ? undefined : converterData}
+        rate={useApiFlow ? undefined : rate}
+        converterData={useApiFlow ? undefined : converterData}
         currencyCodesToFetch={DEFAULT_CURRENCY_CODES}
         onFromValueChange={handleFromValueChange}
         onToValueChange={handleToValueChange}

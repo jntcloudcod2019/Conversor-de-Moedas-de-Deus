@@ -83,13 +83,6 @@ export async function setCachedRate(currencyCode: CurrencyCode, data: CurrencyAp
 }
 
 /**
- * Método assíncrono para limpar o cache
- */
-export async function clearCache(): Promise<void> {
-  cache.clear();
-}
-
-/**
  * Constrói os headers da requisição conforme o modelo da API
  */
 function buildRequestHeaders(config: ApiConfig): HeadersInit {

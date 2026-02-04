@@ -4,11 +4,15 @@
   "private": true,
   "scripts": {
     "build": "wp-scripts build",
-    "postbuild": "cp src/infomoney-currency-converter/render.php build/infomoney-currency-converter/render.php",
+    "postbuild": "cp src/infomoney-currency-converter/render.php build/infomoney-currency-converter/render.php && (cp ../../../design-system/dist/componentes/currency-converter/prerender.html build/infomoney-currency-converter/prerender.html 2>/dev/null || true)",
     "start": "wp-scripts start",
     "packages-update": "wp-scripts packages-update"
   },
   "devDependencies": {
-    "@wordpress/scripts": "^27.0.0"
+    "@wordpress/scripts": "^27.0.0",
+    "country-flag-icons": "^1.6.4",
+    "date-fns": "^4.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }

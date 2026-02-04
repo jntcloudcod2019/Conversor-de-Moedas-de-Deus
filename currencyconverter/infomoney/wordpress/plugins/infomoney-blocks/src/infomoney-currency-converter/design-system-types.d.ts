@@ -73,7 +73,7 @@ export interface CurrencyConverterProps {
   onToValueChange?: (value: number) => void;
   onFromCurrencyChange: (currency: Currency) => void;
   onToCurrencyChange: (currency: Currency) => void;
-  onSwap: (payload: SwapPayload) => void;
+  onSwap?: (payload: SwapPayload) => void;
   converterData?: CurrencyConverterData;
 }
 

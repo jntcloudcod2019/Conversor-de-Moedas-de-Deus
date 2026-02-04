@@ -37,8 +37,13 @@ npm run build
 
 Isso gera os arquivos em `build/infomoney-currency-converter/`.
 
-## Notas
+## Uso do build do design-system
 
-- O bundle do design system deve estar em `assets/currency-converter/`
-- O bloco consome o bundle via `window.InfomoneyCurrencyConverter`
-- O CSS do design system é enfileirado automaticamente
+O **view.js** do bloco não inclui React nem o componente: só carrega o build do design-system (`index.esm.js`) via `import()` e chama `renderCurrencyConverter(container, config)` em cada bloco. A URL do build é passada pelo PHP em `data-ds-url` no script.
+
+Para ter o build do design-system em `assets/currency-converter/`:
+
+1. No design-system: `npm run build-and-copy` (copia `index.esm.js`, `index.cjs.js`, `style.css` para o plugin).
+2. Ou copie manualmente de `design-system/dist/componentes/currency-converter/` para `plugins/infomoney-blocks/assets/currency-converter/`.
+
+O PHP enfileira `theme-block.css` e `style.css` do design-system; o `index.esm.js` é carregado sob demanda pelo view.

@@ -1,19 +1,19 @@
-export type CurrencyCode = 'BRL' | 'USD' |'EUR' |'GBP' |'JPY' 
+/**
+ * Array padrão de códigos de moedas suportadas
+ */
+export const DEFAULT_CURRENCY_CODES = ['BRL', 'USD', 'EUR', 'GBP', 'JPY', 'CNY'] as const;
+
+/**
+ * Type derivado do array de códigos de moedas
+ */
+export type CurrencyCode = typeof DEFAULT_CURRENCY_CODES[number]; 
 
 export type Device = 'web' | 'mobile';
-
 
 export interface Currency {
   code: string;
   symbol: string;
   name: string;
-}
-
-export interface SwapPayload {
-  fromValue: number;
-  toValue: number;
-  hasFromInput: boolean;
-  hasToInput: boolean;
 }
 
 /**
@@ -34,38 +34,58 @@ export interface CurrencyConverterProps {
   rate?: number; // Opcional: pode ser calculado a partir de exchangeRates
   currencies: Currency[];
   exchangeRates?: Record<string, number>; // Taxas de câmbio da API (gerado pelo AutoMapper)
-  device?: Device;
   lastUpdated?: string;
   onFromValueChange: (value: number) => void;
   onToValueChange?: (value: number) => void;
   onFromCurrencyChange: (currency: Currency) => void;
   onToCurrencyChange: (currency: Currency) => void;
-  onSwap: (payload: SwapPayload) => void;
   // Opção alternativa: receber o objeto completo do AutoMapper
   converterData?: CurrencyConverterData;
+  // Moedas para buscar da API na inicialização
+  currencyCodesToFetch?: CurrencyCode[];
+  /** Token para API de cotações (ex.: AwesomeAPI) */
+  apiToken?: string;
 }
 
 /**
- * Interface de contrato para a função initCurrencyConverter
- * Garante que as props sejam validadas antes de passar para o React
+ * Tipos e interfaces para CurrencyService
+ * Baseado na documentação do serviço WordPress
  */
-export interface InitCurrencyConverterParams {
-  containerId: string;
-  props: CurrencyConverterProps;
+
+/**
+ * Item de resposta para valores de cotação de moedas
+ * Formato exato retornado pela API: /market/currency/quote/last/{symbol}
+ */
+export interface CurrencyValuesResponseItem {
+  symbol: string;         // Símbolo da moeda (ex: "USD", "EUR")
+  tradeDate: string;     // Data da negociação (ISO string)
+  bid: number;            // Preço de compra
+  ask: number;             // Preço de venda
+  change: number;         // Variação
+  changeMonth: number;    // Variação mensal
+  changeYear: number;     // Variação anual
+  change52w?: number;     // Variação 52 semanas (opcional)
 }
 
 /**
- * Interface de contrato para validação de props
- * Usada para garantir que todas as props obrigatórias estejam presentes
+ * Estrutura de resposta para valores de cotação de moedas
  */
-export interface ValidatedCurrencyConverterProps extends Required<Pick<CurrencyConverterProps, 
-  'fromValue' | 'toValue' | 'fromCurrency' | 'toCurrency' | 'currencies' | 
-  'onFromValueChange' | 'onFromCurrencyChange' | 'onToCurrencyChange' | 'onSwap'
->> {
-  rate?: number;
-  onToValueChange?: (value: number) => void;
-  exchangeRates?: Record<string, number>;
-  device?: Device;
-  lastUpdated?: string;
-  converterData?: CurrencyConverterData;
+export interface CurrencyValuesResponse {
+  result?: CurrencyValuesResponseItem[]; // Array de itens de cotação
+  pageInfo?: {
+    hasNextPage: boolean; // Indica se há próxima página
+  };
 }
+
+export const currencyToCountryMap: Record<string, string> = {
+  BRL: "BR",
+  USD: "US",
+  EUR: "DE",
+  GBP: "GB",
+  JPY: "JP",
+  CNY: "CN",
+  OJY: "CN",
+};
+
+export const getCountryCodeByCurrency = (currencyCode: string): string =>
+  currencyToCountryMap[currencyCode] || "US";
